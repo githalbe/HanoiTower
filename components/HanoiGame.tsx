@@ -113,6 +113,8 @@ export default function HanoiGame() {
   const [mobile, setMobile] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [rankDiscs, setRankDiscs] = useState(3);
+  // 폰처럼 실제 키보드가 없을 때 숫자 키패드를 띄우는 입력칸에 쳐 둔 첫 숫자
+  const [typed, setTyped] = useState('');
   const pegRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const clock = useRef<ReturnType<typeof setInterval> | null>(null);
   const bubbleId = useRef(0);
@@ -346,6 +348,20 @@ export default function HanoiGame() {
     setRankDiscs(count);
   }
 
+  // 입력칸에 친 숫자를 키보드로 누른 것처럼 하나씩 넘긴다. 지우면 집은 기둥을 내려놓는다
+  function typeDigits(value: string) {
+    const digits = value.replace(/\D/g, '');
+    const shown = typed && game.current.held !== null ? typed : '';
+    if (digits.length <= shown.length) {
+      game.current.held = null;
+      setTyped('');
+      redraw();
+      return;
+    }
+    for (const ch of digits.slice(shown.length)) press(+ch);
+    setTyped(game.current.held !== null ? String(game.current.held + 1) : '');
+  }
+
   const pressRef = useRef(press);
   pressRef.current = press;
   useEffect(() => {
@@ -514,6 +530,20 @@ export default function HanoiGame() {
       </div>
 
       <div className="flex flex-wrap items-end gap-x-7 gap-y-5">
+        <label className="flex flex-col gap-[7px]">
+          <span className={labelText}>숫자로 옮기기</span>
+          <input
+            value={typed && g.held !== null ? typed : ''}
+            onChange={(e) => typeDigits(e.target.value)}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            autoComplete="off"
+            enterKeyHint="done"
+            placeholder="예: 13"
+            aria-label="출발 기둥과 도착 기둥 번호. 예: 13"
+            className="w-24 rounded-[3px] border border-line bg-panel px-2.5 py-[5px] text-center font-mono text-base text-ink placeholder:text-ink-3 focus:outline-2 focus:-outline-offset-1 focus:outline-brass"
+          />
+        </label>
         <div className="flex flex-col gap-[7px]">
           <span className={labelText}>원반 수</span>
           <Seg label="원반 수">
