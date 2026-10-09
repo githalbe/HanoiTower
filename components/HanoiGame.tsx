@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
 import Leaderboard, { type Result } from './Leaderboard';
 import { Button, Seg, SegButton, labelText } from './ui';
 import { DISC_COUNTS, formula, minMoves, seconds, solve, type Move } from '@/lib/hanoi';
@@ -50,6 +50,8 @@ interface Game {
   // 눌러 둔 이동을 차례로 처리한다. 앞 이동이 끝나기 전에 다음 숫자를 눌러도 잃지 않는다
   queue: Promise<void>;
   pending: number;
+  // 시작 전 세는 수. 5 → 1 동안은 못 옮기고, 0 이 되면 시간이 가기 시작한다. 다 세면 null
+  ready: number | null;
   // 새 판을 깔 때 한 번은 미끄러지지 않고 제자리에 놓는다
   instant: boolean;
 }
@@ -72,6 +74,7 @@ function newGame(n: number): Game {
     bubble: null,
     queue: Promise.resolve(),
     pending: 0,
+    ready: null,
     instant: true,
   };
 }
@@ -79,6 +82,12 @@ function newGame(n: number): Game {
 // 처음 기둥이 아닌 곳(가운데든 오른쪽이든)에 모두 쌓으면 끝
 function isDone(g: Game) {
   return g.pegs[1].length === g.n || g.pegs[2].length === g.n;
+}
+
+const READY_FROM = 5;
+
+function waiting(g: Game) {
+  return g.ready !== null && g.ready > 0;
 }
 
 function top(stack: number[]) {
@@ -118,13 +127,14 @@ export default function HanoiGame() {
   const pegRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const clock = useRef<ReturnType<typeof setInterval> | null>(null);
   const bubbleId = useRef(0);
+  const countdown = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const g = game.current;
   const n = g.n;
 
   // 원반 수와 화면 폭에 맞춰 무대 높이와 원반 두께를 정한다
-  const discH = Math.max(13, Math.min(mobile ? 26 : 30, Math.floor((mobile ? 190 : 250) / n)));
-  const stageH = Math.max(mobile ? 195 : 230, PLINTH + Math.round(discH * (n + 1.6)) + 8);
+  const discH = Math.max(12, Math.min(mobile ? 22 : 24, Math.floor((mobile ? 160 : 210) / n)));
+  const stageH = Math.max(mobile ? 175 : 205, PLINTH + Math.round(discH * (n + 1.6)) + 8);
   const rodH = Math.min(stageH - PLINTH - 8, discH * n + discH * 0.9 + 10);
   const geom = useRef({ discH, stageH });
   geom.current = { discH, stageH };
@@ -146,7 +156,44 @@ export default function HanoiGame() {
     return () => cancelAnimationFrame(id);
   });
 
-  useEffect(() => () => stopClock(), []);
+  // 처음 열었을 때도 Ready 부터 센다
+  useEffect(() => {
+    startCountdown();
+    return () => {
+      stopClock();
+      stopCountdown();
+    };
+  }, []);
+
+  function stopCountdown() {
+    if (countdown.current) clearInterval(countdown.current);
+    countdown.current = null;
+  }
+
+  function startCountdown() {
+    stopCountdown();
+    const cur = game.current;
+    cur.ready = READY_FROM;
+    redraw();
+    countdown.current = setInterval(() => {
+      if (game.current !== cur || cur.ready === null) {
+        stopCountdown();
+        return;
+      }
+      cur.ready--;
+      if (cur.ready === 0) {
+        stopCountdown();
+        startClock();
+        // 0 은 Start! 로 잠깐 보여 주고 치운다
+        setTimeout(() => {
+          if (cur.ready !== 0) return;
+          cur.ready = null;
+          redraw();
+        }, 800);
+      }
+      redraw();
+    }, 1000);
+  }
 
   function stopClock() {
     if (clock.current) clearInterval(clock.current);
@@ -163,14 +210,20 @@ export default function HanoiGame() {
     }, 100);
   }
 
-  const build = useCallback((count: number) => {
+  function build(count: number, withCountdown = true) {
     stopClock();
+    stopCountdown();
     const prev = game.current;
     game.current = newGame(count);
     game.current.autoToken = prev.autoToken + 1;
     setResult(null);
-    redraw();
-  }, []);
+    if (withCountdown) startCountdown();
+    else redraw();
+  }
+
+  function notYet() {
+    say(null, `아직 준비 중이에요`, `Ready 가 0이 되면 시작해요`);
+  }
 
   function stepTime() {
     if (prefersReducedMotion()) return 0;
@@ -259,6 +312,10 @@ export default function HanoiGame() {
   function tap(p: number) {
     const cur = game.current;
     if (cur.auto) return;
+    if (waiting(cur)) {
+      notYet();
+      return;
+    }
     if (cur.held === null) {
       if (cur.busy || cur.pending) return;
       if (!cur.pegs[p].length) {
@@ -285,6 +342,10 @@ export default function HanoiGame() {
     const cur = game.current;
     if (cur.auto) {
       say(null, '자동 풀이 중이에요', '멈추기를 누른 뒤 옮겨 주세요');
+      return;
+    }
+    if (waiting(cur)) {
+      notYet();
       return;
     }
     if (d < 1 || d > 3) {
@@ -315,8 +376,10 @@ export default function HanoiGame() {
   async function runAuto() {
     // 손댄 판이면 처음 상태로 되돌린 뒤 푼다
     const dirty = game.current.moves > 0 || game.current.pegs[0].length !== game.current.n;
-    if (dirty) build(game.current.n);
+    if (dirty) build(game.current.n, false);
+    stopCountdown();
     const cur = game.current;
+    cur.ready = null;
     const token = ++cur.autoToken;
     cur.auto = true;
     cur.usedAuto = true;
@@ -383,8 +446,9 @@ export default function HanoiGame() {
   let status: string;
   if (done) status = g.moves === best ? '최적 풀이' : '완성';
   else if (g.auto) status = '자동 풀이 중';
+  else if (waiting(g)) status = '준비 중';
   else if (g.held !== null) status = `${g.held + 1}번에서 집음`;
-  else if (g.moves > 0) status = '진행 중';
+  else if (g.moves > 0 || g.startAt) status = '진행 중';
   else status = '시작 전';
 
   const heldTop = g.held !== null ? g.pegs[g.held][g.pegs[g.held].length - 1] : null;
@@ -447,6 +511,20 @@ export default function HanoiGame() {
   return (
     <>
       <div className="rounded border border-line bg-panel px-3 pt-3 shadow-[0_1px_0_var(--shadow)] sm:px-[18px] sm:pt-[18px]">
+        {/* 시작 카운트다운. 자리를 늘 비워 두어 숫자가 사라져도 게임판이 움직이지 않는다 */}
+        <div className="mb-1 flex h-6 items-center" aria-live="polite">
+          {g.ready !== null && (
+            <span
+              key={g.ready}
+              className={cn(
+                'animate-pop rounded-[3px] border border-brass px-2 font-mono text-[13px] leading-[22px] tabular-nums',
+                g.ready > 0 ? 'text-brass' : 'bg-brass font-semibold text-panel',
+              )}
+            >
+              {g.ready > 0 ? `Ready : ${g.ready}` : 'Start!'}
+            </span>
+          )}
+        </div>
         <div
           className="relative h-(--stage-h) w-full touch-manipulation"
           style={
