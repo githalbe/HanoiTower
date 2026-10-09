@@ -104,7 +104,7 @@ h1{
 }
 .disc.held{box-shadow:0 6px 14px var(--shadow), inset 0 -2px 0 rgba(0,0,0,.16), inset 0 2px 0 rgba(255,255,255,.16), 0 0 0 3px var(--glow)}
 
-.readout{display:grid; grid-template-columns:repeat(3,1fr); border-top:1px solid var(--line); background:var(--panel)}
+.readout{display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--line); background:var(--panel)}
 .cell{padding:12px 16px 14px; border-left:1px solid var(--line)}
 .cell:first-child{border-left:0}
 .cell .k{
@@ -153,6 +153,30 @@ h1{
 .rule .n{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--brass); letter-spacing:.1em}
 .rule p{margin:4px 0 0; font-size:14px; color:var(--ink-2)}
 
+.board{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:18px 20px}
+.board-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap}
+.board h2{font-family:"Gowun Batang",serif; font-weight:700; font-size:19px; margin:0}
+.board-sub{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.12em; color:var(--ink-3)}
+.submit{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:14px; padding:12px 14px; background:var(--panel-2); border-radius:3px}
+.submit[hidden]{display:none}
+.submit p{margin:0; flex:1 1 220px; font-size:14px; color:var(--ink-2)}
+.submit input{
+  font:inherit; font-size:14px; padding:7px 10px; width:150px;
+  background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:3px;
+}
+.submit input:focus{outline:2px solid var(--brass); outline-offset:-1px}
+.ranks{width:100%; border-collapse:collapse; margin-top:12px; font-size:14px}
+.ranks th{
+  font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.16em; font-weight:400;
+  text-transform:uppercase; color:var(--ink-3); text-align:left; padding:6px 8px; border-bottom:1px solid var(--line);
+}
+.ranks td{padding:7px 8px; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums}
+.ranks tr:last-child td{border-bottom:0}
+.ranks td.num, .ranks th.num{text-align:right; font-family:"IBM Plex Mono",monospace}
+.ranks tr.mine td{color:var(--brass); font-weight:600}
+.ranks .empty{color:var(--ink-3); text-align:center; padding:16px 8px}
+.ranks .name{overflow-wrap:anywhere}
+
 .legend{border-top:1px solid var(--line); padding-top:22px; color:var(--ink-2); font-size:14px; max-width:64ch}
 .legend h2{font-family:"Gowun Batang",serif; font-weight:700; font-size:19px; margin:0 0 8px; color:var(--ink)}
 .legend p{margin:0 0 10px}
@@ -167,7 +191,9 @@ h1{
   .cell{padding:10px 12px 12px}
   .cell .v{font-size:18px}
   .readout{grid-template-columns:1fr 1fr}
-  .cell:nth-child(3){grid-column:1 / -1; border-left:0; border-top:1px solid var(--line)}
+  .cell:nth-child(3){border-left:0}
+  .cell:nth-child(n+3){border-top:1px solid var(--line)}
+  .board{padding:14px 12px}
   .rules{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion: reduce){ .disc{transition:none} }
@@ -195,6 +221,10 @@ h1{
       <div class="cell">
         <div class="k">최소 횟수</div>
         <div class="v" id="formula">2³ − 1 = 7</div>
+      </div>
+      <div class="cell">
+        <div class="k">시간</div>
+        <div class="v" id="clock">0.0<small>초</small></div>
       </div>
       <div class="cell">
         <div class="k">상태</div>
@@ -226,6 +256,22 @@ h1{
     </div>
   </div>
 
+  <section class="board" aria-labelledby="boardTitle">
+    <div class="board-head">
+      <h2 id="boardTitle">랭킹</h2>
+      <span class="board-sub" id="boardSub">원반 3개 · 적은 이동, 빠른 시간 순</span>
+    </div>
+    <form class="submit" id="submitForm" hidden>
+      <p id="submitMsg"></p>
+      <input id="nameInput" maxlength="16" placeholder="이름" autocomplete="nickname" required>
+      <button class="btn primary" id="submitBtn" type="submit">기록 등록</button>
+    </form>
+    <table class="ranks">
+      <thead><tr><th class="num">#</th><th>이름</th><th class="num">이동</th><th class="num">시간</th></tr></thead>
+      <tbody id="rankBody"><tr><td class="empty" colspan="4">불러오는 중…</td></tr></tbody>
+    </table>
+  </section>
+
   <div class="rules">
     <div class="rule"><div class="n">규칙 1</div><p>원반은 한 번에 하나씩만 옮깁니다.</p></div>
     <div class="rule"><div class="n">규칙 2</div><p>각 기둥의 맨 위 원반만 집을 수 있습니다.</p></div>
@@ -242,6 +288,10 @@ h1{
 </div>
 
 <script>
+// Supabase 프로젝트 주소와 anon(공개) 키. anon 키는 브라우저에 노출되는 용도라 여기 두어도 됩니다.
+var SUPABASE_URL = '';
+var SUPABASE_ANON_KEY = '';
+
 (function(){
   var stage    = document.getElementById('stage');
   var pegEls   = Array.prototype.slice.call(stage.querySelectorAll('.peg'));
@@ -254,6 +304,13 @@ h1{
   var autoBtn  = document.getElementById('autoBtn');
   var undoBtn  = document.getElementById('undoBtn');
   var resetBtn = document.getElementById('resetBtn');
+  var clockEl  = document.getElementById('clock');
+  var boardSub = document.getElementById('boardSub');
+  var rankBody = document.getElementById('rankBody');
+  var submitForm = document.getElementById('submitForm');
+  var submitMsg  = document.getElementById('submitMsg');
+  var nameInput  = document.getElementById('nameInput');
+  var submitBtn  = document.getElementById('submitBtn');
 
   var SUP = ['⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹'];
   var PEG_X = [16.667, 50, 83.333];
@@ -263,6 +320,9 @@ h1{
   var n = 3, speed = 150, pegs = [[],[],[]], discEls = [], moves = 0, history = [];
   var held = null, busy = false, auto = false, autoToken = 0;
   var discH = 28, stageH = 320;
+  var startAt = 0, elapsed = 0, clockTimer = 0, usedAuto = false, finished = false, myId = null;
+  var RANK_ON = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+  var NAME_KEY = 'hanoi-name';
 
   for (var i = 3; i <= 8; i++){
     var b = document.createElement('button');
@@ -304,9 +364,104 @@ h1{
       pegs[0].push(size);
     }
     moves = 0; history = []; held = null;
+    resetClock();
+    usedAuto = false; finished = false; myId = null;
+    submitForm.hidden = true;
     layout(true);
     render();
+    loadRanks();
   }
+
+  function fmt(ms){ return (ms / 1000).toFixed(1); }
+  function showClock(){ clockEl.innerHTML = fmt(elapsed) + '<small>초</small>'; }
+  function resetClock(){
+    clearInterval(clockTimer); clockTimer = 0; startAt = 0; elapsed = 0; showClock();
+  }
+  function startClock(){
+    if (startAt) return;
+    startAt = performance.now();
+    clockTimer = setInterval(function(){ elapsed = performance.now() - startAt; showClock(); }, 100);
+  }
+  function stopClock(){
+    if (startAt) elapsed = performance.now() - startAt;
+    clearInterval(clockTimer); clockTimer = 0; showClock();
+  }
+
+  function checkWin(){
+    if (finished || pegs[2].length !== n) return;
+    finished = true;
+    stopClock();
+    if (usedAuto || !RANK_ON) return;
+    submitMsg.textContent = '원반 ' + n + '개를 ' + moves + '번 이동, ' + fmt(elapsed) + '초에 완성했어요. 랭킹에 올릴까요?';
+    try { nameInput.value = localStorage.getItem(NAME_KEY) || ''; } catch (e) {}
+    submitBtn.disabled = false;
+    submitForm.hidden = false;
+    nameInput.focus();
+  }
+
+  function api(path, opts){
+    opts = opts || {};
+    opts.headers = Object.assign({
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    }, opts.headers || {});
+    return fetch(SUPABASE_URL + '/rest/v1/' + path, opts).then(function(r){
+      if (!r.ok) throw new Error(r.status);
+      return r.status === 204 ? null : r.json();
+    });
+  }
+
+  function rankRow(text){
+    rankBody.innerHTML = '';
+    var tr = document.createElement('tr'), td = document.createElement('td');
+    td.className = 'empty'; td.colSpan = 4; td.textContent = text;
+    tr.appendChild(td); rankBody.appendChild(tr);
+  }
+
+  var rankToken = 0;
+  function loadRanks(){
+    boardSub.textContent = '원반 ' + n + '개 · 적은 이동, 빠른 시간 순';
+    if (!RANK_ON){ rankRow('랭킹 서버가 아직 연결되지 않았어요.'); return; }
+    var token = ++rankToken, count = n;
+    api('scores?select=id,name,moves,ms&discs=eq.' + count + '&order=moves.asc,ms.asc,created_at.asc&limit=10')
+      .then(function(rows){
+        if (token !== rankToken) return;
+        if (!rows.length){ rankRow('아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요.'); return; }
+        rankBody.innerHTML = '';
+        rows.forEach(function(r, i){
+          var tr = document.createElement('tr');
+          if (r.id === myId) tr.className = 'mine';
+          [[i + 1, 'num'], [r.name, 'name'], [r.moves, 'num'], [fmt(r.ms) + '초', 'num']].forEach(function(c){
+            var td = document.createElement('td');
+            td.className = c[1]; td.textContent = c[0];
+            tr.appendChild(td);
+          });
+          rankBody.appendChild(tr);
+        });
+      })
+      .catch(function(){ if (token === rankToken) rankRow('랭킹을 불러오지 못했어요.'); });
+  }
+
+  submitForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    var name = nameInput.value.trim().slice(0, 16);
+    if (!name){ nameInput.focus(); return; }
+    try { localStorage.setItem(NAME_KEY, name); } catch (err) {}
+    submitBtn.disabled = true;
+    api('scores', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ name: name, discs: n, moves: moves, ms: Math.round(elapsed) })
+    }).then(function(rows){
+      myId = rows && rows[0] ? rows[0].id : null;
+      submitForm.hidden = true;
+      loadRanks();
+    }).catch(function(){
+      submitMsg.textContent = '등록하지 못했어요. 잠시 후 다시 시도해 주세요.';
+      submitBtn.disabled = false;
+    });
+  });
 
   function layout(instant){
     if (instant) discEls.forEach(function(d){ if (d) d.style.transition = 'none'; });
@@ -396,7 +551,8 @@ h1{
     }
     var from = held;
     held = null;
-    move(from, p, true).then(render);
+    startClock();
+    move(from, p, true).then(function(){ render(); checkWin(); });
   }
 
   function plan(k, from, to, via, out){
@@ -409,14 +565,14 @@ h1{
 
   function runAuto(){
     var token = ++autoToken;
-    auto = true; held = null;
+    auto = true; usedAuto = true; held = null;
     autoBtn.textContent = '멈추기';
     render();
 
     var start = Promise.resolve();
     if (moves > 0 || pegs[0].length !== n){
       build();
-      auto = true;
+      auto = true; usedAuto = true;
       autoBtn.textContent = '멈추기';
       render();
       start = wait(reduce.matches ? 0 : 240);
