@@ -11,6 +11,7 @@
   --brass:#8E6511; --brass-hi:#A87A1C; --glow:rgba(142,101,17,.20);
   --rod:#9C8B63; --rod-cap:#B8992F; --plinth:#2B332F; --plinth-2:#3A443E;
   --disc-fg:#F4F1E6; --shadow:rgba(19,28,25,.16);
+  --danger:#B3362B; --danger-fg:#FFF8F5;
   --d1:#2A6B70; --d2:#35786A; --d3:#4E8259; --d4:#7C8A3E;
   --d5:#A88A2E; --d6:#C0762A; --d7:#B8562A; --d8:#9B3A2E;
 }
@@ -21,6 +22,7 @@
     --brass:#D9A441; --brass-hi:#F0C46A; --glow:rgba(217,164,65,.24);
     --rod:#6E6244; --rod-cap:#C79A3A; --plinth:#080D0B; --plinth-2:#131C18;
     --disc-fg:#0C1310; --shadow:rgba(0,0,0,.45);
+    --danger:#E0604F; --danger-fg:#1A0A07;
     --d1:#3A8B90; --d2:#47967F; --d3:#64A06C; --d4:#9AAA4C;
     --d5:#CBA739; --d6:#E08F34; --d7:#DC6B37; --d8:#C04A3B;
   }
@@ -31,6 +33,7 @@
   --brass:#D9A441; --brass-hi:#F0C46A; --glow:rgba(217,164,65,.24);
   --rod:#6E6244; --rod-cap:#C79A3A; --plinth:#080D0B; --plinth-2:#131C18;
   --disc-fg:#0C1310; --shadow:rgba(0,0,0,.45);
+  --danger:#E0604F; --danger-fg:#1A0A07;
   --d1:#3A8B90; --d2:#47967F; --d3:#64A06C; --d4:#9AAA4C;
   --d5:#CBA739; --d6:#E08F34; --d7:#DC6B37; --d8:#C04A3B;
 }
@@ -53,6 +56,8 @@
   --color-plinth-2: var(--plinth-2);
   --color-disc-fg: var(--disc-fg);
   --color-shadow: var(--shadow);
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
 
   /* 글꼴은 layout.tsx 에서 next/font 로 받아 온다 */
   --font-sans: var(--font-plex-sans), 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
@@ -63,6 +68,15 @@
 @theme {
   /* 폰 화면 기준. 이보다 넓으면 sm: 이 붙은 모양이 된다 */
   --breakpoint-sm: 35rem;
+
+  /* 말풍선이 살짝 떠오르며 나타난다 */
+  --animate-pop: pop 0.16s ease-out;
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.96);
+    }
+  }
 }
 
 @layer base {

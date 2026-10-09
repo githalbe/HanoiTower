@@ -24,6 +24,14 @@ interface Flying {
   t: number;
 }
 
+// 옮길 수 없을 때 기둥 위에 잠깐 띄우는 말풍선. peg 가 null 이면 무대 가운데 위
+interface Bubble {
+  id: number;
+  peg: number | null;
+  title: string;
+  reason: string;
+}
+
 interface Game {
   n: number;
   pegs: number[][];
@@ -38,7 +46,10 @@ interface Game {
   startAt: number;
   elapsed: number;
   flying: Flying | null;
-  warning: string | null;
+  bubble: Bubble | null;
+  // 눌러 둔 이동을 차례로 처리한다. 앞 이동이 끝나기 전에 다음 숫자를 눌러도 잃지 않는다
+  queue: Promise<void>;
+  pending: number;
   // 새 판을 깔 때 한 번은 미끄러지지 않고 제자리에 놓는다
   instant: boolean;
 }
@@ -58,7 +69,9 @@ function newGame(n: number): Game {
     startAt: 0,
     elapsed: 0,
     flying: null,
-    warning: null,
+    bubble: null,
+    queue: Promise.resolve(),
+    pending: 0,
     instant: true,
   };
 }
@@ -66,6 +79,20 @@ function newGame(n: number): Game {
 // 처음 기둥이 아닌 곳(가운데든 오른쪽이든)에 모두 쌓으면 끝
 function isDone(g: Game) {
   return g.pegs[1].length === g.n || g.pegs[2].length === g.n;
+}
+
+function top(stack: number[]) {
+  return stack[stack.length - 1] as number | undefined;
+}
+
+// 옮길 수 없는 까닭. 옮길 수 있으면 null
+function blocked(g: Game, from: number, to: number): string | null {
+  if (from === to) return '같은 기둥으로는 옮길 수 없어요';
+  const moving = top(g.pegs[from]);
+  if (moving === undefined) return `${from + 1}번 기둥에 원반이 없어요`;
+  const target = top(g.pegs[to]);
+  if (target !== undefined && target < moving) return `${moving}번 원반을 더 작은 ${target}번 원반 위에 올릴 수 없어요`;
+  return null;
 }
 
 function wait(ms: number) {
@@ -88,6 +115,7 @@ export default function HanoiGame() {
   const [rankDiscs, setRankDiscs] = useState(3);
   const pegRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const clock = useRef<ReturnType<typeof setInterval> | null>(null);
+  const bubbleId = useRef(0);
 
   const g = game.current;
   const n = g.n;
@@ -193,12 +221,50 @@ export default function HanoiGame() {
     );
   }
 
+  function say(peg: number | null, title: string, reason: string) {
+    const cur = game.current;
+    const id = ++bubbleId.current;
+    cur.bubble = { id, peg, title, reason };
+    redraw();
+    setTimeout(() => {
+      if (game.current.bubble?.id !== id) return;
+      game.current.bubble = null;
+      redraw();
+    }, 2200);
+  }
+
+  // 판이 바뀌면(새 판, 원반 수 변경) 남은 이동은 버린다
+  function enqueue(from: number, to: number) {
+    const cur = game.current;
+    cur.pending++;
+    redraw();
+    cur.queue = cur.queue.then(async () => {
+      cur.pending--;
+      if (game.current !== cur || cur.auto) return;
+      const why = blocked(cur, from, to);
+      if (why) {
+        shake(to);
+        say(to, `${from + 1} → ${to + 1} 이동 불가`, why);
+        return;
+      }
+      startClock();
+      await move(from, to, true);
+      checkWin();
+    });
+  }
+
+  // 마우스: 기둥을 눌러 집고, 다른 기둥을 눌러 놓는다. 같은 기둥을 다시 누르면 집기 취소
   function tap(p: number) {
     const cur = game.current;
-    if (cur.busy || cur.auto) return;
-    cur.warning = null;
+    if (cur.auto) return;
     if (cur.held === null) {
-      if (cur.pegs[p].length) cur.held = p;
+      if (cur.busy || cur.pending) return;
+      if (!cur.pegs[p].length) {
+        say(p, `${p + 1}번 기둥에 원반이 없어요`, '원반이 있는 기둥부터 눌러 주세요');
+        return;
+      }
+      cur.held = p;
+      cur.bubble = null;
       redraw();
       return;
     }
@@ -207,18 +273,34 @@ export default function HanoiGame() {
       redraw();
       return;
     }
-    const moving = cur.pegs[cur.held][cur.pegs[cur.held].length - 1];
-    const target = cur.pegs[p][cur.pegs[p].length - 1];
-    if (target !== undefined && target < moving) {
-      shake(p);
-      cur.warning = '더 작은 원반 위에는 못 올립니다';
+    const from = cur.held;
+    cur.held = null;
+    enqueue(from, p);
+  }
+
+  // 키보드: 13 처럼 숫자 두 개로 출발·도착 기둥을 고른다
+  function press(d: number) {
+    const cur = game.current;
+    if (cur.auto) {
+      say(null, '자동 풀이 중이에요', '멈추기를 누른 뒤 옮겨 주세요');
+      return;
+    }
+    if (d < 1 || d > 3) {
+      cur.held = null;
+      say(null, `${d}번 기둥은 없어요`, '1, 2, 3 중에서 눌러 주세요');
+      return;
+    }
+    const p = d - 1;
+    if (cur.held === null) {
+      // 23 처럼 두 숫자를 다 받은 뒤에 한꺼번에 따져 "2 → 3 이동 불가" 로 알린다
+      cur.held = p;
+      cur.bubble = null;
       redraw();
       return;
     }
     const from = cur.held;
     cur.held = null;
-    startClock();
-    move(from, p, true).then(checkWin);
+    enqueue(from, p);
   }
 
   function stopAuto() {
@@ -237,7 +319,7 @@ export default function HanoiGame() {
     cur.auto = true;
     cur.usedAuto = true;
     cur.held = null;
-    cur.warning = null;
+    cur.bubble = null;
     redraw();
     if (dirty) await wait(prefersReducedMotion() ? 0 : 240);
     for (const [a, b] of solve(cur.n)) {
@@ -249,10 +331,10 @@ export default function HanoiGame() {
 
   function undo() {
     const cur = game.current;
-    if (cur.busy || cur.auto || !cur.history.length) return;
+    if (cur.busy || cur.auto || cur.pending || !cur.history.length) return;
     const [from, to] = cur.history.pop()!;
     cur.held = null;
-    cur.warning = null;
+    cur.bubble = null;
     move(to, from, false).then(() => {
       cur.moves = Math.max(0, cur.moves - 1);
       redraw();
@@ -264,15 +346,15 @@ export default function HanoiGame() {
     setRankDiscs(count);
   }
 
-  // 키보드 1 2 3 은 기둥을 누른 것과 같다
-  const tapRef = useRef(tap);
-  tapRef.current = tap;
+  const pressRef = useRef(press);
+  pressRef.current = press;
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement) return;
-      if (e.key >= '1' && e.key <= '3') tapRef.current(+e.key - 1);
-      else if (e.key === 'Escape' && game.current.held !== null) {
+      if (e.target instanceof HTMLInputElement || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      if (/^[0-9]$/.test(e.key)) pressRef.current(+e.key);
+      else if (e.key === 'Escape') {
         game.current.held = null;
+        game.current.bubble = null;
         redraw();
       }
     }
@@ -284,7 +366,6 @@ export default function HanoiGame() {
   const done = isDone(g);
   let status: string;
   if (done) status = g.moves === best ? '최적 풀이' : '완성';
-  else if (g.warning) status = g.warning;
   else if (g.auto) status = '자동 풀이 중';
   else if (g.held !== null) status = `${g.held + 1}번에서 집음`;
   else if (g.moves > 0) status = '진행 중';
@@ -349,7 +430,7 @@ export default function HanoiGame() {
 
   return (
     <>
-      <div className="overflow-hidden rounded border border-line bg-panel px-3 pt-3 shadow-[0_1px_0_var(--shadow)] sm:px-[18px] sm:pt-[18px]">
+      <div className="rounded border border-line bg-panel px-3 pt-3 shadow-[0_1px_0_var(--shadow)] sm:px-[18px] sm:pt-[18px]">
         <div
           className="relative h-(--stage-h) w-full touch-manipulation"
           style={
@@ -412,6 +493,7 @@ export default function HanoiGame() {
               {size}
             </div>
           ))}
+          {g.bubble && <ErrorBubble bubble={g.bubble} bottom={PLINTH + rodH + 16} />}
         </div>
         <div className="grid grid-cols-2 border-t border-line bg-panel sm:grid-cols-4">
           {readout.map((c, i) => (
@@ -458,7 +540,7 @@ export default function HanoiGame() {
             <Button variant="primary" onClick={() => (g.auto ? stopAuto() : runAuto())}>
               {g.auto ? '멈추기' : '자동 풀이'}
             </Button>
-            <Button disabled={g.busy || g.auto || g.history.length === 0} onClick={undo}>
+            <Button disabled={g.busy || g.auto || g.pending > 0 || g.history.length === 0} onClick={undo}>
               되돌리기
             </Button>
             <Button onClick={() => build(n)}>처음부터</Button>
@@ -468,5 +550,33 @@ export default function HanoiGame() {
 
       <Leaderboard discs={rankDiscs} onDiscsChange={setRankDiscs} result={result} onSubmitted={() => setResult(null)} />
     </>
+  );
+}
+
+// 기둥 꼭대기 위에 뜨는 말풍선. 양 끝 기둥에서는 화면 밖으로 나가지 않게 꼬리 쪽으로 붙인다
+function ErrorBubble({ bubble, bottom }: { bubble: Bubble; bottom: number }) {
+  const p = bubble.peg;
+  const place =
+    p === null
+      ? 'top-2 left-1/2 -translate-x-1/2'
+      : p === 0
+        ? '-translate-x-7'
+        : p === 1
+          ? '-translate-x-1/2'
+          : '-translate-x-[calc(100%-28px)]';
+  const tail = p === 0 ? 'left-[22px]' : p === 1 ? 'left-1/2 -translate-x-1/2' : 'right-[22px]';
+  return (
+    <div
+      role="alert"
+      className={cn(
+        'pointer-events-none absolute z-60 w-max max-w-[min(240px,80vw)] animate-pop rounded-md bg-danger px-3 py-2 text-[13px]/[1.45] text-danger-fg shadow-[0_6px_16px_var(--shadow)]',
+        place,
+      )}
+      style={p === null ? undefined : { left: `${PEG_X[p]}%`, bottom }}
+    >
+      <div className="font-semibold">{bubble.title}</div>
+      <div className="opacity-85">{bubble.reason}</div>
+      {p !== null && <span className={cn('absolute -bottom-1.5 size-3 rotate-45 bg-danger', tail)} />}
+    </div>
   );
 }

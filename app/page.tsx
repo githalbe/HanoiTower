@@ -15,9 +15,9 @@ export default function Home() {
           하노이탑
         </h1>
         <p className="max-w-[62ch] text-ink-2">
-          기둥을 눌러 원반을 집고, 다른 기둥을 눌러 내려놓습니다. 모든 원반을{' '}
-          <b className="font-semibold text-ink">다른 기둥 하나</b>로 옮기면 끝. 키보드{' '}
-          <b className="font-semibold text-ink">1 2 3</b>도 같은 역할을 합니다.
+          기둥을 눌러 원반을 집고, 다른 기둥을 눌러 내려놓습니다. 키보드로는{' '}
+          <b className="font-semibold text-ink">13</b>처럼 숫자 두 개를 누르면 1번 기둥에서 3번 기둥으로 옮깁니다. 모든
+          원반을 <b className="font-semibold text-ink">다른 기둥 하나</b>로 옮기면 끝.
         </p>
       </header>
 
