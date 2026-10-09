@@ -135,7 +135,8 @@ export default function HanoiGame() {
   // 원반 수와 화면 폭에 맞춰 무대 높이와 원반 두께를 정한다
   const discH = Math.max(12, Math.min(mobile ? 22 : 24, Math.floor((mobile ? 160 : 210) / n)));
   const stageH = Math.max(mobile ? 175 : 205, PLINTH + Math.round(discH * (n + 1.6)) + 8);
-  const rodH = Math.min(stageH - PLINTH - 8, discH * n + discH * 0.9 + 10);
+  // 맨 위 원반 위로 기둥이 반 칸쯤만 남게
+  const rodH = Math.min(stageH - PLINTH - 8, discH * n + discH * 0.45 + 6);
   const geom = useRef({ discH, stageH });
   geom.current = { discH, stageH };
 
