@@ -555,7 +555,8 @@ export default function HanoiGame() {
                       : 'shadow-[inset_0_-2px_3px_rgba(0,0,0,.3)] group-hover:shadow-[inset_0_-2px_3px_rgba(0,0,0,.3),0_0_0_5px_var(--glow)] group-focus-visible:shadow-[inset_0_-2px_3px_rgba(0,0,0,.3),0_0_0_5px_var(--glow)]',
                   )}
                 />
-                <span className="pointer-events-none absolute bottom-[calc(var(--plinth-h)/2)] left-1/2 -translate-x-1/2 translate-y-1/2 font-mono text-[13px] leading-none font-semibold tracking-[.12em] text-white/90">
+                {/* 받침의 기둥 번호. 원문자처럼 동그라미 안에 넣는다 */}
+                <span className="pointer-events-none absolute bottom-[calc(var(--plinth-h)/2)] left-1/2 flex size-[17px] -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-white/85 font-mono text-[11px] leading-none font-semibold text-white/95">
                   {p + 1}
                 </span>
               </button>
