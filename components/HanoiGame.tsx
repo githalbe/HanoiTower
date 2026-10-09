@@ -7,7 +7,7 @@ import { DISC_COUNTS, formula, minMoves, seconds, solve, type Move } from '@/lib
 import { cn } from '@/lib/utils';
 
 const PEG_X = [16.667, 50, 83.333];
-const PLINTH = 16;
+const PLINTH = 20;
 const SPEEDS = [
   { label: '느리게', ms: 300 },
   { label: '보통', ms: 150 },
@@ -84,6 +84,8 @@ function isDone(g: Game) {
   return g.pegs[1].length === g.n || g.pegs[2].length === g.n;
 }
 
+// Ready 카운트다운을 잠시 꺼 둔다. 다시 쓰려면 true 로 바꾼다
+const USE_COUNTDOWN = false;
 const READY_FROM = 5;
 
 function waiting(g: Game) {
@@ -122,8 +124,6 @@ export default function HanoiGame() {
   const [mobile, setMobile] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [rankDiscs, setRankDiscs] = useState(3);
-  // 폰처럼 실제 키보드가 없을 때 숫자 키패드를 띄우는 입력칸에 쳐 둔 첫 숫자
-  const [typed, setTyped] = useState('');
   const pegRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const clock = useRef<ReturnType<typeof setInterval> | null>(null);
   const bubbleId = useRef(0);
@@ -172,6 +172,7 @@ export default function HanoiGame() {
 
   function startCountdown() {
     stopCountdown();
+    if (!USE_COUNTDOWN) return;
     const cur = game.current;
     cur.ready = READY_FROM;
     redraw();
@@ -411,20 +412,6 @@ export default function HanoiGame() {
     setRankDiscs(count);
   }
 
-  // 입력칸에 친 숫자를 키보드로 누른 것처럼 하나씩 넘긴다. 지우면 집은 기둥을 내려놓는다
-  function typeDigits(value: string) {
-    const digits = value.replace(/\D/g, '');
-    const shown = typed && game.current.held !== null ? typed : '';
-    if (digits.length <= shown.length) {
-      game.current.held = null;
-      setTyped('');
-      redraw();
-      return;
-    }
-    for (const ch of digits.slice(shown.length)) press(+ch);
-    setTyped(game.current.held !== null ? String(game.current.held + 1) : '');
-  }
-
   const pressRef = useRef(press);
   pressRef.current = press;
   useEffect(() => {
@@ -512,19 +499,21 @@ export default function HanoiGame() {
     <>
       <div className="rounded border border-line bg-panel px-3 pt-3 shadow-[0_1px_0_var(--shadow)] sm:px-[18px] sm:pt-[18px]">
         {/* 시작 카운트다운. 자리를 늘 비워 두어 숫자가 사라져도 게임판이 움직이지 않는다 */}
-        <div className="mb-1 flex h-6 items-center" aria-live="polite">
-          {g.ready !== null && (
-            <span
-              key={g.ready}
-              className={cn(
-                'animate-pop rounded-[3px] border border-brass px-2 font-mono text-[13px] leading-[22px] tabular-nums',
-                g.ready > 0 ? 'text-brass' : 'bg-brass font-semibold text-panel',
+        {USE_COUNTDOWN && (
+          <div className="mb-1 flex h-6 items-center" aria-live="polite">
+            {g.ready !== null && (
+              <span
+                key={g.ready}
+                className={cn(
+                  'animate-pop rounded-[3px] border border-brass px-2 font-mono text-[13px] leading-[22px] tabular-nums',
+                  g.ready > 0 ? 'text-brass' : 'bg-brass font-semibold text-panel',
               )}
             >
               {g.ready > 0 ? `Ready : ${g.ready}` : 'Start!'}
             </span>
           )}
         </div>
+        )}
         <div
           className="relative h-(--stage-h) w-full touch-manipulation"
           style={
@@ -566,7 +555,7 @@ export default function HanoiGame() {
                       : 'shadow-[inset_0_-2px_3px_rgba(0,0,0,.3)] group-hover:shadow-[inset_0_-2px_3px_rgba(0,0,0,.3),0_0_0_5px_var(--glow)] group-focus-visible:shadow-[inset_0_-2px_3px_rgba(0,0,0,.3),0_0_0_5px_var(--glow)]',
                   )}
                 />
-                <span className="pointer-events-none absolute bottom-[calc(var(--plinth-h)/2)] left-1/2 -translate-x-1/2 translate-y-1/2 font-mono text-[10px] leading-normal tracking-[.18em] text-white/55">
+                <span className="pointer-events-none absolute bottom-[calc(var(--plinth-h)/2)] left-1/2 -translate-x-1/2 translate-y-1/2 font-mono text-[13px] leading-none font-semibold tracking-[.12em] text-white/90">
                   {p + 1}
                 </span>
               </button>
@@ -608,20 +597,6 @@ export default function HanoiGame() {
       </div>
 
       <div className="flex flex-wrap items-end gap-x-7 gap-y-5">
-        <label className="flex flex-col gap-[7px]">
-          <span className={labelText}>숫자로 옮기기</span>
-          <input
-            value={typed && g.held !== null ? typed : ''}
-            onChange={(e) => typeDigits(e.target.value)}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            autoComplete="off"
-            enterKeyHint="done"
-            placeholder="예: 13"
-            aria-label="출발 기둥과 도착 기둥 번호. 예: 13"
-            className="w-24 rounded-[3px] border border-line bg-panel px-2.5 py-[5px] text-center font-mono text-base text-ink placeholder:text-ink-3 focus:outline-2 focus:-outline-offset-1 focus:outline-brass"
-          />
-        </label>
         <div className="flex flex-col gap-[7px]">
           <span className={labelText}>원반 수</span>
           <Seg label="원반 수">
