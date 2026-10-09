@@ -16,7 +16,7 @@ export default function Home() {
         </h1>
         <p className="max-w-[62ch] text-ink-2">
           기둥을 눌러 원반을 집고, 다른 기둥을 눌러 내려놓습니다. 모든 원반을{' '}
-          <b className="font-semibold text-ink">오른쪽 기둥</b>으로 옮기면 끝. 키보드{' '}
+          <b className="font-semibold text-ink">다른 기둥 하나</b>로 옮기면 끝. 키보드{' '}
           <b className="font-semibold text-ink">1 2 3</b>도 같은 역할을 합니다.
         </p>
       </header>

@@ -63,6 +63,11 @@ function newGame(n: number): Game {
   };
 }
 
+// 처음 기둥이 아닌 곳(가운데든 오른쪽이든)에 모두 쌓으면 끝
+function isDone(g: Game) {
+  return g.pegs[1].length === g.n || g.pegs[2].length === g.n;
+}
+
 function wait(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
 }
@@ -168,7 +173,7 @@ export default function HanoiGame() {
 
   function checkWin() {
     const cur = game.current;
-    if (cur.finished || cur.pegs[2].length !== cur.n) return;
+    if (cur.finished || !isDone(cur)) return;
     cur.finished = true;
     if (cur.startAt) cur.elapsed = performance.now() - cur.startAt;
     stopClock();
@@ -276,7 +281,7 @@ export default function HanoiGame() {
   }, []);
 
   const best = minMoves(n);
-  const done = g.pegs[2].length === n;
+  const done = isDone(g);
   let status: string;
   if (done) status = g.moves === best ? '최적 풀이' : '완성';
   else if (g.warning) status = g.warning;
