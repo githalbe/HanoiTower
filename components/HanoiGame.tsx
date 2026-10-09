@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
 import Leaderboard, { type Result } from './Leaderboard';
 import { Button, Seg, SegButton, labelText } from './ui';
 import { DISC_COUNTS, formula, minMoves, seconds, solve, type Move } from '@/lib/hanoi';
@@ -493,7 +493,7 @@ export default function HanoiGame() {
               {size}
             </div>
           ))}
-          {g.bubble && <ErrorBubble bubble={g.bubble} bottom={PLINTH + rodH + 16} />}
+          {g.bubble && <ErrorBubble bubble={g.bubble} bottom={PLINTH + rodH + 16} stageH={stageH} />}
         </div>
         <div className="grid grid-cols-2 border-t border-line bg-panel sm:grid-cols-4">
           {readout.map((c, i) => (
@@ -553,9 +553,16 @@ export default function HanoiGame() {
   );
 }
 
-// 기둥 꼭대기 위에 뜨는 말풍선. 양 끝 기둥에서는 화면 밖으로 나가지 않게 꼬리 쪽으로 붙인다
-function ErrorBubble({ bubble, bottom }: { bubble: Bubble; bottom: number }) {
+// 기둥 꼭대기 위에 뜨는 말풍선. 양 끝 기둥에서는 화면 밖으로 나가지 않게 꼬리 쪽으로 붙인다.
+// 원반이 많아 기둥 위에 자리가 없으면 게임판 위 끝에 맞춰 내려 앉는다. 위의 안내 글을 가리지 않게
+function ErrorBubble({ bubble, bottom, stageH }: { bubble: Bubble; bottom: number; stageH: number }) {
   const p = bubble.peg;
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || p === null) return;
+    el.style.bottom = `${Math.min(bottom, stageH - el.offsetHeight - 6)}px`;
+  }, [bubble.id, p, bottom, stageH]);
   const place =
     p === null
       ? 'top-2 left-1/2 -translate-x-1/2'
@@ -567,6 +574,7 @@ function ErrorBubble({ bubble, bottom }: { bubble: Bubble; bottom: number }) {
   const tail = p === 0 ? 'left-[22px]' : p === 1 ? 'left-1/2 -translate-x-1/2' : 'right-[22px]';
   return (
     <div
+      ref={ref}
       role="alert"
       className={cn(
         'pointer-events-none absolute z-60 w-max max-w-[min(240px,80vw)] animate-pop rounded-md bg-danger px-3 py-2 text-[13px]/[1.45] text-danger-fg shadow-[0_6px_16px_var(--shadow)]',
