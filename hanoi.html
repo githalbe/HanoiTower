@@ -154,7 +154,8 @@ h1{
 .rule p{margin:4px 0 0; font-size:14px; color:var(--ink-2)}
 
 .board{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:18px 20px}
-.board-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap}
+.board-head{display:flex; align-items:center; justify-content:space-between; gap:10px 12px; flex-wrap:wrap; margin-bottom:6px}
+.seg button[aria-selected="true"]{background:var(--brass); color:var(--panel); font-weight:500}
 .board h2{font-family:"Gowun Batang",serif; font-weight:700; font-size:19px; margin:0}
 .board-sub{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.12em; color:var(--ink-3)}
 .submit{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:14px; padding:12px 14px; background:var(--panel-2); border-radius:3px}
@@ -259,8 +260,9 @@ h1{
   <section class="board" aria-labelledby="boardTitle">
     <div class="board-head">
       <h2 id="boardTitle">랭킹</h2>
-      <span class="board-sub" id="boardSub">원반 3개 · 적은 이동, 빠른 시간 순</span>
+      <div class="seg" id="rankSeg" role="tablist" aria-label="랭킹 원반 수"></div>
     </div>
+    <div class="board-sub" id="boardSub">원반 3개 · 적은 이동, 빠른 시간 순</div>
     <form class="submit" id="submitForm" hidden>
       <p id="submitMsg"></p>
       <input id="nameInput" maxlength="16" placeholder="이름" autocomplete="nickname" required>
@@ -306,6 +308,7 @@ var SUPABASE_ANON_KEY = 'sb_publishable_-fXTqmacpfGB-LB4zItkFQ_AXwXx7jo';
   var resetBtn = document.getElementById('resetBtn');
   var clockEl  = document.getElementById('clock');
   var boardSub = document.getElementById('boardSub');
+  var rankSeg  = document.getElementById('rankSeg');
   var rankBody = document.getElementById('rankBody');
   var submitForm = document.getElementById('submitForm');
   var submitMsg  = document.getElementById('submitMsg');
@@ -323,6 +326,7 @@ var SUPABASE_ANON_KEY = 'sb_publishable_-fXTqmacpfGB-LB4zItkFQ_AXwXx7jo';
   var startAt = 0, elapsed = 0, clockTimer = 0, usedAuto = false, finished = false, myId = null;
   var RANK_ON = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
   var NAME_KEY = 'hanoi-name';
+  var rankN = 3, builtN = 0;
 
   for (var i = 3; i <= 8; i++){
     var b = document.createElement('button');
@@ -330,6 +334,14 @@ var SUPABASE_ANON_KEY = 'sb_publishable_-fXTqmacpfGB-LB4zItkFQ_AXwXx7jo';
     b.setAttribute('data-count', i);
     b.setAttribute('aria-pressed', i === 3 ? 'true' : 'false');
     countSeg.appendChild(b);
+
+    var t = document.createElement('button');
+    t.textContent = i;
+    t.setAttribute('role', 'tab');
+    t.setAttribute('data-count', i);
+    t.setAttribute('aria-label', '원반 ' + i + '개 랭킹');
+    t.setAttribute('aria-selected', i === 3 ? 'true' : 'false');
+    rankSeg.appendChild(t);
   }
 
   function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
@@ -369,7 +381,7 @@ var SUPABASE_ANON_KEY = 'sb_publishable_-fXTqmacpfGB-LB4zItkFQ_AXwXx7jo';
     submitForm.hidden = true;
     layout(true);
     render();
-    loadRanks();
+    if (builtN !== n){ builtN = n; loadRanks(n); }
   }
 
   function fmt(ms){ return (ms / 1000).toFixed(1); }
@@ -419,13 +431,19 @@ var SUPABASE_ANON_KEY = 'sb_publishable_-fXTqmacpfGB-LB4zItkFQ_AXwXx7jo';
   }
 
   var rankToken = 0;
-  function loadRanks(){
-    boardSub.textContent = '원반 ' + n + '개 · 적은 이동, 빠른 시간 순';
+  function loadRanks(count){
+    rankN = count;
+    Array.prototype.forEach.call(rankSeg.children, function(x){
+      x.setAttribute('aria-selected', +x.getAttribute('data-count') === count ? 'true' : 'false');
+    });
+    boardSub.textContent = '원반 ' + count + '개 · 적은 이동, 빠른 시간 순';
     if (!RANK_ON){ rankRow('랭킹 서버가 아직 연결되지 않았어요.'); return; }
-    var token = ++rankToken, count = n;
+    var token = ++rankToken;
+    if (!rankBody.querySelector('.empty')) rankBody.style.opacity = '.5';
     api('scores?select=id,name,moves,ms&discs=eq.' + count + '&order=moves.asc,ms.asc,created_at.asc&limit=10')
       .then(function(rows){
         if (token !== rankToken) return;
+        rankBody.style.opacity = '';
         if (!rows.length){ rankRow('아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요.'); return; }
         rankBody.innerHTML = '';
         rows.forEach(function(r, i){
@@ -439,8 +457,18 @@ var SUPABASE_ANON_KEY = 'sb_publishable_-fXTqmacpfGB-LB4zItkFQ_AXwXx7jo';
           rankBody.appendChild(tr);
         });
       })
-      .catch(function(){ if (token === rankToken) rankRow('랭킹을 불러오지 못했어요.'); });
+      .catch(function(){
+        if (token !== rankToken) return;
+        rankBody.style.opacity = '';
+        rankRow('랭킹을 불러오지 못했어요.');
+      });
   }
+
+  rankSeg.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    var count = +b.getAttribute('data-count');
+    if (count !== rankN) loadRanks(count);
+  });
 
   submitForm.addEventListener('submit', function(e){
     e.preventDefault();
@@ -448,14 +476,15 @@ var SUPABASE_ANON_KEY = 'sb_publishable_-fXTqmacpfGB-LB4zItkFQ_AXwXx7jo';
     if (!name){ nameInput.focus(); return; }
     try { localStorage.setItem(NAME_KEY, name); } catch (err) {}
     submitBtn.disabled = true;
+    var discs = n;
     api('scores', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ name: name, discs: n, moves: moves, ms: Math.round(elapsed) })
+      body: JSON.stringify({ name: name, discs: discs, moves: moves, ms: Math.round(elapsed) })
     }).then(function(rows){
       myId = rows && rows[0] ? rows[0].id : null;
       submitForm.hidden = true;
-      loadRanks();
+      loadRanks(discs);
     }).catch(function(){
       submitMsg.textContent = '등록하지 못했어요. 잠시 후 다시 시도해 주세요.';
       submitBtn.disabled = false;
