@@ -288,9 +288,9 @@ h1{
 </div>
 
 <script>
-// Supabase 프로젝트 주소와 anon(공개) 키. anon 키는 브라우저에 노출되는 용도라 여기 두어도 됩니다.
-var SUPABASE_URL = '';
-var SUPABASE_ANON_KEY = '';
+// Supabase 프로젝트 주소와 publishable(공개) 키. 이 키는 브라우저에 노출되는 용도라 여기 두어도 됩니다.
+var SUPABASE_URL = 'https://iwzwjledzckzjpblvamv.supabase.co';
+var SUPABASE_ANON_KEY = 'sb_publishable_-fXTqmacpfGB-LB4zItkFQ_AXwXx7jo';
 
 (function(){
   var stage    = document.getElementById('stage');
@@ -403,7 +403,6 @@ var SUPABASE_ANON_KEY = '';
     opts = opts || {};
     opts.headers = Object.assign({
       apikey: SUPABASE_ANON_KEY,
-      Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
       'Content-Type': 'application/json'
     }, opts.headers || {});
     return fetch(SUPABASE_URL + '/rest/v1/' + path, opts).then(function(r){
