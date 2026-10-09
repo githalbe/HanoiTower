@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hanoi-out",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "3200", "-d", "out"],
+      "port": 3200
+    }
+  ]
+}
