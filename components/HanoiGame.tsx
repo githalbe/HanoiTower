@@ -8,11 +8,8 @@ import { cn } from '@/lib/utils';
 
 const PEG_X = [16.667, 50, 83.333];
 const PLINTH = 20;
-const SPEEDS = [
-  { label: '느리게', ms: 300 },
-  { label: '보통', ms: 150 },
-  { label: '빠르게', ms: 55 },
-];
+// 자동 풀이에서 한 동작(들기·옮기기·놓기)에 쓰는 시간
+const AUTO_STEP_MS = 150;
 const PEG_NAMES = ['첫째 기둥', '둘째 기둥', '셋째 기둥'];
 
 // 옮기는 중인 원반. 들어올림 → 옆으로 → 내려놓음 순서로 그린다
@@ -118,9 +115,6 @@ export default function HanoiGame() {
   // 애니메이션이 await 사이사이에 상태를 읽고 바꾸므로 판 자체는 ref 에 두고 다시 그리기만 요청한다
   const game = useRef<Game>(newGame(3));
   const [, redraw] = useReducer((x: number) => x + 1, 0);
-  const [speed, setSpeed] = useState(150);
-  const speedRef = useRef(speed);
-  speedRef.current = speed;
   const [mobile, setMobile] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [rankDiscs, setRankDiscs] = useState(3);
@@ -229,7 +223,7 @@ export default function HanoiGame() {
 
   function stepTime() {
     if (prefersReducedMotion()) return 0;
-    return game.current.auto ? speedRef.current : 140;
+    return game.current.auto ? AUTO_STEP_MS : 140;
   }
 
   async function move(from: number, to: number, record: boolean) {
@@ -605,16 +599,6 @@ export default function HanoiGame() {
             {DISC_COUNTS.map((c) => (
               <SegButton key={c} selected={c === n} aria-pressed={c === n} onClick={() => changeCount(c)}>
                 {c}
-              </SegButton>
-            ))}
-          </Seg>
-        </div>
-        <div className="flex flex-col gap-[7px]">
-          <span className={labelText}>속도</span>
-          <Seg label="자동 풀이 속도">
-            {SPEEDS.map((s) => (
-              <SegButton key={s.ms} selected={s.ms === speed} aria-pressed={s.ms === speed} onClick={() => setSpeed(s.ms)}>
-                {s.label}
               </SegButton>
             ))}
           </Seg>
