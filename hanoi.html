@@ -1,0 +1,490 @@
+<title>하노이탑</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;600&display=swap">
+
+<style>
+:root{
+  --ground:#E4E8E4; --panel:#F4F6F2; --panel-2:#EAEEE9; --line:#C6CFC8;
+  --ink:#131C19; --ink-2:#3E4A45; --ink-3:#6E7B75;
+  --brass:#8E6511; --brass-hi:#A87A1C; --glow:rgba(142,101,17,.20);
+  --rod:#9C8B63; --rod-cap:#B8992F; --plinth:#2B332F; --plinth-2:#3A443E;
+  --disc-fg:#F4F1E6; --shadow:rgba(19,28,25,.16);
+  --d1:#2A6B70; --d2:#35786A; --d3:#4E8259; --d4:#7C8A3E;
+  --d5:#A88A2E; --d6:#C0762A; --d7:#B8562A; --d8:#9B3A2E;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0E1512; --panel:#161F1B; --panel-2:#1C2722; --line:#2B3931;
+    --ink:#DFE7E1; --ink-2:#A8B5AE; --ink-3:#76847D;
+    --brass:#D9A441; --brass-hi:#F0C46A; --glow:rgba(217,164,65,.24);
+    --rod:#6E6244; --rod-cap:#C79A3A; --plinth:#080D0B; --plinth-2:#131C18;
+    --disc-fg:#0C1310; --shadow:rgba(0,0,0,.45);
+    --d1:#3A8B90; --d2:#47967F; --d3:#64A06C; --d4:#9AAA4C;
+    --d5:#CBA739; --d6:#E08F34; --d7:#DC6B37; --d8:#C04A3B;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0E1512; --panel:#161F1B; --panel-2:#1C2722; --line:#2B3931;
+  --ink:#DFE7E1; --ink-2:#A8B5AE; --ink-3:#76847D;
+  --brass:#D9A441; --brass-hi:#F0C46A; --glow:rgba(217,164,65,.24);
+  --rod:#6E6244; --rod-cap:#C79A3A; --plinth:#080D0B; --plinth-2:#131C18;
+  --disc-fg:#0C1310; --shadow:rgba(0,0,0,.45);
+  --d1:#3A8B90; --d2:#47967F; --d3:#64A06C; --d4:#9AAA4C;
+  --d5:#CBA739; --d6:#E08F34; --d7:#DC6B37; --d8:#C04A3B;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:820px; margin:0 auto; padding:48px 20px 64px; display:flex; flex-direction:column; gap:30px}
+
+header{display:flex; flex-direction:column; gap:8px}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--brass); font-weight:500;
+}
+h1{
+  font-family:"Gowun Batang","Apple SD Gothic Neo",serif; font-weight:700;
+  font-size:clamp(34px,7vw,52px); line-height:1.12; margin:0; letter-spacing:-.01em;
+  text-wrap:balance;
+}
+.lede{margin:0; color:var(--ink-2); max-width:62ch}
+.lede b{color:var(--ink); font-weight:600}
+
+.stage-frame{
+  background:var(--panel); border:1px solid var(--line); border-radius:4px;
+  padding:18px 18px 0; box-shadow:0 1px 0 var(--shadow); overflow:hidden;
+}
+.stage{position:relative; width:100%; height:var(--stage-h,320px); touch-action:manipulation}
+.peg{
+  position:absolute; bottom:0; top:0; width:33.333%; transform:translateX(-50%);
+  background:none; border:0; padding:0; cursor:pointer; -webkit-tap-highlight-color:transparent;
+}
+.peg::before{
+  content:""; position:absolute; left:50%; bottom:var(--plinth-h); width:9px;
+  height:var(--rod-h); transform:translateX(-50%); border-radius:5px 5px 0 0;
+  background:linear-gradient(90deg,#0003 0%,var(--rod) 45%,#fff5 56%,var(--rod) 100%);
+  transition:box-shadow .2s ease;
+}
+.peg::after{
+  content:""; position:absolute; left:50%; width:15px; height:15px; border-radius:50%;
+  transform:translateX(-50%); background:var(--rod-cap);
+  bottom:calc(var(--plinth-h) + var(--rod-h) - 7px);
+  box-shadow:inset 0 -2px 3px rgba(0,0,0,.3);
+  transition:box-shadow .2s ease;
+}
+.peg:hover::after{box-shadow:inset 0 -2px 3px rgba(0,0,0,.3),0 0 0 5px var(--glow)}
+.peg:focus-visible{outline:none}
+.peg:focus-visible::after{box-shadow:inset 0 -2px 3px rgba(0,0,0,.3),0 0 0 5px var(--glow)}
+.peg.armed::before{box-shadow:0 0 0 4px var(--glow)}
+.peg.armed::after{box-shadow:inset 0 -2px 3px rgba(0,0,0,.3),0 0 0 6px var(--glow)}
+
+.plinth{
+  position:absolute; left:0; right:0; bottom:0; height:var(--plinth-h);
+  background:linear-gradient(180deg,var(--plinth-2),var(--plinth)); border-radius:3px;
+}
+.peg-key{
+  position:absolute; bottom:calc(var(--plinth-h) / 2); left:50%; transform:translate(-50%,50%);
+  font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.18em;
+  color:rgba(255,255,255,.55); pointer-events:none;
+}
+
+.disc{
+  position:absolute; transform:translateX(-50%); height:var(--disc-h);
+  border-radius:calc(var(--disc-h) / 2);
+  display:flex; align-items:center; justify-content:center;
+  font-family:"IBM Plex Mono",monospace; font-weight:500; font-size:calc(var(--disc-h) * .46);
+  color:var(--disc-fg); pointer-events:none;
+  box-shadow:0 1px 2px var(--shadow), inset 0 -2px 0 rgba(0,0,0,.16), inset 0 2px 0 rgba(255,255,255,.16);
+  transition:left var(--t,150ms) cubic-bezier(.4,0,.2,1), bottom var(--t,150ms) cubic-bezier(.4,0,.2,1), box-shadow .18s ease;
+}
+.disc.held{box-shadow:0 6px 14px var(--shadow), inset 0 -2px 0 rgba(0,0,0,.16), inset 0 2px 0 rgba(255,255,255,.16), 0 0 0 3px var(--glow)}
+
+.readout{display:grid; grid-template-columns:repeat(3,1fr); border-top:1px solid var(--line); background:var(--panel)}
+.cell{padding:12px 16px 14px; border-left:1px solid var(--line)}
+.cell:first-child{border-left:0}
+.cell .k{
+  font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink-3);
+}
+.cell .v{
+  font-family:"IBM Plex Mono",monospace; font-size:22px; font-variant-numeric:tabular-nums;
+  color:var(--ink); margin-top:2px; line-height:1.25;
+}
+.cell .v small{font-size:13px; color:var(--ink-3)}
+#status{font-size:15px; font-family:"IBM Plex Sans KR",sans-serif; padding-top:4px}
+#status.win{color:var(--brass); font-weight:600}
+
+.controls{display:flex; flex-wrap:wrap; gap:20px 28px; align-items:flex-end}
+.group{display:flex; flex-direction:column; gap:7px}
+.group > span{
+  font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink-3);
+}
+.seg{display:flex; border:1px solid var(--line); border-radius:3px; overflow:hidden; background:var(--panel)}
+.seg button{
+  font:inherit; font-family:"IBM Plex Mono",monospace; font-size:13px;
+  background:none; border:0; border-left:1px solid var(--line);
+  padding:7px 12px; color:var(--ink-2); cursor:pointer; transition:background .15s ease,color .15s ease;
+}
+.seg button:first-child{border-left:0}
+.seg button:hover{background:var(--panel-2); color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--brass); color:var(--panel); font-weight:500}
+.seg button:focus-visible{outline:2px solid var(--brass); outline-offset:-2px}
+
+.btn{
+  font:inherit; font-size:14px; padding:8px 16px; cursor:pointer;
+  background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:3px;
+  transition:background .15s ease, border-color .15s ease;
+}
+.btn:hover{background:var(--panel-2); border-color:var(--ink-3)}
+.btn:focus-visible{outline:2px solid var(--brass); outline-offset:2px}
+.btn:disabled{opacity:.42; cursor:default}
+.btn.primary{background:var(--brass); border-color:var(--brass); color:var(--panel); font-weight:600}
+.btn.primary:hover{background:var(--brass-hi); border-color:var(--brass-hi)}
+.row{display:flex; gap:8px; flex-wrap:wrap}
+
+.rules{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line)}
+.rule{background:var(--panel); padding:14px 16px}
+.rule .n{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--brass); letter-spacing:.1em}
+.rule p{margin:4px 0 0; font-size:14px; color:var(--ink-2)}
+
+.legend{border-top:1px solid var(--line); padding-top:22px; color:var(--ink-2); font-size:14px; max-width:64ch}
+.legend h2{font-family:"Gowun Batang",serif; font-weight:700; font-size:19px; margin:0 0 8px; color:var(--ink)}
+.legend p{margin:0 0 10px}
+.big-num{
+  font-family:"IBM Plex Mono",monospace; font-size:13px; color:var(--brass);
+  font-variant-numeric:tabular-nums; word-break:break-all;
+}
+
+@media (max-width:560px){
+  .wrap{padding:32px 14px 48px; gap:24px}
+  .stage-frame{padding:12px 12px 0}
+  .cell{padding:10px 12px 12px}
+  .cell .v{font-size:18px}
+  .readout{grid-template-columns:1fr 1fr}
+  .cell:nth-child(3){grid-column:1 / -1; border-left:0; border-top:1px solid var(--line)}
+  .rules{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion: reduce){ .disc{transition:none} }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Tower of Hanoi</div>
+    <h1>하노이탑</h1>
+    <p class="lede">기둥을 눌러 원반을 집고, 다른 기둥을 눌러 내려놓습니다. 모든 원반을 <b>오른쪽 기둥</b>으로 옮기면 끝. 키보드 <b>1 2 3</b>도 같은 역할을 합니다.</p>
+  </header>
+
+  <div class="stage-frame">
+    <div class="stage" id="stage">
+      <div class="plinth"></div>
+      <button class="peg" data-peg="0" style="left:16.667%" aria-label="첫째 기둥"><span class="peg-key">1</span></button>
+      <button class="peg" data-peg="1" style="left:50%" aria-label="둘째 기둥"><span class="peg-key">2</span></button>
+      <button class="peg" data-peg="2" style="left:83.333%" aria-label="셋째 기둥"><span class="peg-key">3</span></button>
+    </div>
+    <div class="readout">
+      <div class="cell">
+        <div class="k">이동 횟수</div>
+        <div class="v"><span id="moves">0</span> <small>/ <span id="best">7</span></small></div>
+      </div>
+      <div class="cell">
+        <div class="k">최소 횟수</div>
+        <div class="v" id="formula">2³ − 1 = 7</div>
+      </div>
+      <div class="cell">
+        <div class="k">상태</div>
+        <div class="v" id="status">시작 전</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="group">
+      <span>원반 수</span>
+      <div class="seg" id="countSeg" role="group" aria-label="원반 수"></div>
+    </div>
+    <div class="group">
+      <span>속도</span>
+      <div class="seg" id="speedSeg" role="group" aria-label="자동 풀이 속도">
+        <button data-speed="300" aria-pressed="false">느리게</button>
+        <button data-speed="150" aria-pressed="true">보통</button>
+        <button data-speed="55" aria-pressed="false">빠르게</button>
+      </div>
+    </div>
+    <div class="group">
+      <span>조작</span>
+      <div class="row">
+        <button class="btn primary" id="autoBtn">자동 풀이</button>
+        <button class="btn" id="undoBtn" disabled>되돌리기</button>
+        <button class="btn" id="resetBtn">처음부터</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="rules">
+    <div class="rule"><div class="n">규칙 1</div><p>원반은 한 번에 하나씩만 옮깁니다.</p></div>
+    <div class="rule"><div class="n">규칙 2</div><p>각 기둥의 맨 위 원반만 집을 수 있습니다.</p></div>
+    <div class="rule"><div class="n">규칙 3</div><p>큰 원반을 작은 원반 위에 올릴 수 없습니다.</p></div>
+  </div>
+
+  <div class="legend">
+    <h2>64개의 원반</h2>
+    <p>인도 바라나시의 어느 사원에 다이아몬드 기둥 셋과 황금 원반 예순넷이 있고, 승려들이 밤낮으로 그것을 옮기고 있다는 이야기가 전해집니다. 마지막 원반이 제자리에 놓이는 순간 세상이 끝난다고 합니다.</p>
+    <p>다행히 시간은 넉넉합니다. 원반 64개를 옮기려면 최소</p>
+    <p class="big-num">18,446,744,073,709,551,615회</p>
+    <p>가 필요하고, 1초에 한 번씩 쉬지 않고 옮겨도 약 5,850억 년이 걸립니다. 우주 나이의 마흔 배쯤 됩니다.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var stage    = document.getElementById('stage');
+  var pegEls   = Array.prototype.slice.call(stage.querySelectorAll('.peg'));
+  var movesEl  = document.getElementById('moves');
+  var bestEl   = document.getElementById('best');
+  var formEl   = document.getElementById('formula');
+  var statusEl = document.getElementById('status');
+  var countSeg = document.getElementById('countSeg');
+  var speedSeg = document.getElementById('speedSeg');
+  var autoBtn  = document.getElementById('autoBtn');
+  var undoBtn  = document.getElementById('undoBtn');
+  var resetBtn = document.getElementById('resetBtn');
+
+  var SUP = ['⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹'];
+  var PEG_X = [16.667, 50, 83.333];
+  var PLINTH = 16;
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)');
+
+  var n = 3, speed = 150, pegs = [[],[],[]], discEls = [], moves = 0, history = [];
+  var held = null, busy = false, auto = false, autoToken = 0;
+  var discH = 28, stageH = 320;
+
+  for (var i = 3; i <= 8; i++){
+    var b = document.createElement('button');
+    b.textContent = i;
+    b.setAttribute('data-count', i);
+    b.setAttribute('aria-pressed', i === 3 ? 'true' : 'false');
+    countSeg.appendChild(b);
+  }
+
+  function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  function discWidth(size){ return 13 + (31 - 13) * (n === 1 ? 1 : (size - 1) / (n - 1)); }
+  function slotY(k){ return PLINTH + k * discH; }
+  function liftY(){ return stageH - discH - 4; }
+  function stepTime(){ return reduce.matches ? 0 : (auto ? speed : 140); }
+
+  function measure(){
+    var mob = window.innerWidth < 560;
+    discH = Math.max(13, Math.min(mob ? 26 : 30, Math.floor((mob ? 190 : 250) / n)));
+    stageH = Math.max(mob ? 195 : 230, PLINTH + Math.round(discH * (n + 1.6)) + 8);
+    var rodH = Math.min(stageH - PLINTH - 8, discH * n + discH * 0.9 + 10);
+    stage.style.setProperty('--stage-h', stageH + 'px');
+    stage.style.setProperty('--disc-h', discH + 'px');
+    stage.style.setProperty('--plinth-h', PLINTH + 'px');
+    stage.style.setProperty('--rod-h', rodH + 'px');
+  }
+
+  function build(){
+    measure();
+    discEls.forEach(function(d){ if (d) d.remove(); });
+    pegs = [[], [], []];
+    discEls = [];
+    for (var size = n; size >= 1; size--){
+      var d = document.createElement('div');
+      d.className = 'disc';
+      d.style.background = 'var(--d' + (n === 1 ? 1 : Math.round(1 + 7 * (size - 1) / (n - 1))) + ')';
+      d.textContent = size;
+      stage.appendChild(d);
+      discEls[size] = d;
+      pegs[0].push(size);
+    }
+    moves = 0; history = []; held = null;
+    layout(true);
+    render();
+  }
+
+  function layout(instant){
+    if (instant) discEls.forEach(function(d){ if (d) d.style.transition = 'none'; });
+    pegs.forEach(function(stack, p){
+      stack.forEach(function(size, k){
+        var d = discEls[size];
+        d.style.left = PEG_X[p] + '%';
+        d.style.bottom = slotY(k) + 'px';
+        d.style.width = discWidth(size) + '%';
+      });
+    });
+    if (instant) requestAnimationFrame(function(){
+      discEls.forEach(function(d){ if (d) d.style.transition = ''; });
+    });
+  }
+
+  function render(){
+    var best = Math.pow(2, n) - 1;
+    movesEl.textContent = moves;
+    bestEl.textContent = best;
+    formEl.textContent = '2' + String(n).split('').map(function(c){ return SUP[+c]; }).join('') + ' − 1 = ' + best;
+    undoBtn.disabled = busy || auto || history.length === 0;
+
+    pegEls.forEach(function(el, i){ el.classList.toggle('armed', held === i); });
+    discEls.forEach(function(d){ if (d) d.classList.remove('held'); });
+    if (held !== null && pegs[held].length){
+      discEls[pegs[held][pegs[held].length - 1]].classList.add('held');
+    }
+
+    var done = pegs[2].length === n;
+    statusEl.classList.toggle('win', done);
+    if (done) statusEl.textContent = moves === best ? '최적 풀이' : '완성';
+    else if (auto) statusEl.textContent = '자동 풀이 중';
+    else if (held !== null) statusEl.textContent = (held + 1) + '번에서 집음';
+    else if (moves > 0) statusEl.textContent = '진행 중';
+    else statusEl.textContent = '시작 전';
+  }
+
+  function move(from, to, record){
+    var size = pegs[from].pop();
+    var d = discEls[size];
+    var t = stepTime();
+    d.style.setProperty('--t', t + 'ms');
+    d.style.zIndex = '50';
+    busy = true;
+    return Promise.resolve()
+      .then(function(){
+        if (!t) return;
+        d.style.bottom = liftY() + 'px';
+        return wait(t);
+      })
+      .then(function(){
+        d.style.left = PEG_X[to] + '%';
+        if (t) return wait(t);
+      })
+      .then(function(){
+        pegs[to].push(size);
+        d.style.bottom = slotY(pegs[to].length - 1) + 'px';
+        if (t) return wait(t);
+      })
+      .then(function(){
+        d.style.zIndex = '';
+        busy = false;
+        if (record){ moves++; history.push([from, to]); }
+      });
+  }
+
+  function tap(p){
+    if (busy || auto) return;
+    if (held === null){
+      if (!pegs[p].length) return;
+      held = p; render(); return;
+    }
+    if (held === p){ held = null; render(); return; }
+
+    var moving = pegs[held][pegs[held].length - 1];
+    var target = pegs[p].length ? pegs[p][pegs[p].length - 1] : null;
+    if (target !== null && target < moving){
+      pegEls[p].animate([
+        {transform:'translateX(-50%)'},
+        {transform:'translateX(calc(-50% - 5px))'},
+        {transform:'translateX(calc(-50% + 5px))'},
+        {transform:'translateX(-50%)'}
+      ], {duration:220});
+      statusEl.textContent = '더 작은 원반 위에는 못 올립니다';
+      return;
+    }
+    var from = held;
+    held = null;
+    move(from, p, true).then(render);
+  }
+
+  function plan(k, from, to, via, out){
+    if (k === 0) return out;
+    plan(k - 1, from, via, to, out);
+    out.push([from, to]);
+    plan(k - 1, via, to, from, out);
+    return out;
+  }
+
+  function runAuto(){
+    var token = ++autoToken;
+    auto = true; held = null;
+    autoBtn.textContent = '멈추기';
+    render();
+
+    var start = Promise.resolve();
+    if (moves > 0 || pegs[0].length !== n){
+      build();
+      auto = true;
+      autoBtn.textContent = '멈추기';
+      render();
+      start = wait(reduce.matches ? 0 : 240);
+    }
+
+    start.then(function(){
+      if (token !== autoToken) return;
+      var steps = plan(n, 0, 2, 1, []);
+      var chain = Promise.resolve();
+      steps.forEach(function(s){
+        chain = chain.then(function(){
+          if (token !== autoToken) return;
+          return move(s[0], s[1], true).then(render);
+        });
+      });
+      return chain.then(function(){
+        if (token === autoToken) stopAuto();
+      });
+    });
+  }
+
+  function stopAuto(){
+    autoToken++;
+    auto = false;
+    autoBtn.textContent = '자동 풀이';
+    render();
+  }
+
+  function undo(){
+    if (busy || auto || !history.length) return;
+    var last = history.pop();
+    held = null;
+    move(last[1], last[0], false).then(function(){
+      moves = Math.max(0, moves - 1);
+      render();
+    });
+  }
+
+  pegEls.forEach(function(el){
+    el.addEventListener('click', function(){ tap(+el.getAttribute('data-peg')); });
+  });
+  addEventListener('keydown', function(e){
+    if (e.key >= '1' && e.key <= '3') tap(+e.key - 1);
+    else if (e.key === 'Escape' && held !== null){ held = null; render(); }
+  });
+  countSeg.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    stopAuto();
+    n = +b.getAttribute('data-count');
+    Array.prototype.forEach.call(countSeg.children, function(x){
+      x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+    });
+    build();
+  });
+  speedSeg.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    speed = +b.getAttribute('data-speed');
+    Array.prototype.forEach.call(speedSeg.children, function(x){
+      x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+    });
+  });
+  autoBtn.addEventListener('click', function(){ auto ? stopAuto() : runAuto(); });
+  undoBtn.addEventListener('click', undo);
+  resetBtn.addEventListener('click', function(){ stopAuto(); build(); });
+  addEventListener('resize', function(){
+    if (!busy && !auto){ measure(); layout(true); }
+  });
+
+  build();
+})();
+</script>
