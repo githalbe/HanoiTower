@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
 import Leaderboard, { type Result } from './Leaderboard';
+import { Button, Seg, SegButton, labelText } from './ui';
 import { DISC_COUNTS, formula, minMoves, seconds, solve, type Move } from '@/lib/hanoi';
+import { cn } from '@/lib/utils';
 
 const PEG_X = [16.667, 50, 83.333];
 const PLINTH = 16;
@@ -177,10 +179,10 @@ export default function HanoiGame() {
   function shake(p: number) {
     pegRefs.current[p]?.animate(
       [
-        { transform: 'translateX(-50%)' },
-        { transform: 'translateX(calc(-50% - 5px))' },
-        { transform: 'translateX(calc(-50% + 5px))' },
-        { transform: 'translateX(-50%)' },
+        { transform: 'translateX(0)' },
+        { transform: 'translateX(-5px)' },
+        { transform: 'translateX(5px)' },
+        { transform: 'translateX(0)' },
       ],
       { duration: 220 },
     );
@@ -316,11 +318,35 @@ export default function HanoiGame() {
     };
   }
 
+  const readout = [
+    {
+      k: '이동 횟수',
+      v: (
+        <>
+          {g.moves} <small className="text-[13px] text-ink-3">/ {best}</small>
+        </>
+      ),
+    },
+    { k: '최소 횟수', v: formula(n) },
+    {
+      k: '시간',
+      v: (
+        <>
+          {seconds(g.elapsed)}
+          <small className="text-[13px] text-ink-3">초</small>
+        </>
+      ),
+    },
+    { k: '상태', v: status },
+  ];
+  // 폰에서는 2×2, 넓으면 한 줄에 넷
+  const cellBorder = ['', 'border-l', 'border-t sm:border-t-0 sm:border-l', 'border-l border-t sm:border-t-0'];
+
   return (
     <>
-      <div className="stage-frame">
+      <div className="overflow-hidden rounded border border-line bg-panel px-3 pt-3 shadow-[0_1px_0_var(--shadow)] sm:px-[18px] sm:pt-[18px]">
         <div
-          className="stage"
+          className="relative h-(--stage-h) w-full touch-manipulation"
           style={
             {
               '--stage-h': `${stageH}px`,
@@ -330,87 +356,107 @@ export default function HanoiGame() {
             } as CSSProperties
           }
         >
-          <div className="plinth" />
-          {PEG_X.map((x, p) => (
-            <button
-              key={p}
-              ref={(el) => {
-                pegRefs.current[p] = el;
-              }}
-              className={`peg${g.held === p ? ' armed' : ''}`}
-              style={{ left: `${x}%` }}
-              aria-label={PEG_NAMES[p]}
-              onClick={() => tap(p)}
-            >
-              <span className="peg-key">{p + 1}</span>
-            </button>
-          ))}
+          <div className="absolute inset-x-0 bottom-0 h-(--plinth-h) rounded-[3px] bg-linear-to-b from-plinth-2 to-plinth" />
+          {PEG_X.map((x, p) => {
+            const armed = g.held === p;
+            return (
+              <button
+                key={p}
+                ref={(el) => {
+                  pegRefs.current[p] = el;
+                }}
+                className="group absolute top-0 bottom-0 w-1/3 -translate-x-1/2 cursor-pointer [-webkit-tap-highlight-color:transparent] focus-visible:outline-none"
+                style={{ left: `${x}%` }}
+                aria-label={PEG_NAMES[p]}
+                onClick={() => tap(p)}
+              >
+                {/* 기둥 */}
+                <span
+                  className={cn(
+                    'absolute bottom-(--plinth-h) left-1/2 h-(--rod-h) w-[9px] -translate-x-1/2 rounded-t-[5px] bg-[linear-gradient(90deg,#0003_0%,var(--rod)_45%,#fff5_56%,var(--rod)_100%)] transition-shadow',
+                    armed && 'shadow-[0_0_0_4px_var(--glow)]',
+                  )}
+                />
+                {/* 꼭대기 장식. 가리키거나 집으면 빛이 번진다 */}
+                <span
+                  className={cn(
+                    'absolute bottom-[calc(var(--plinth-h)+var(--rod-h)-7px)] left-1/2 size-[15px] -translate-x-1/2 rounded-full bg-rod-cap transition-shadow',
+                    armed
+                      ? 'shadow-[inset_0_-2px_3px_rgba(0,0,0,.3),0_0_0_6px_var(--glow)]'
+                      : 'shadow-[inset_0_-2px_3px_rgba(0,0,0,.3)] group-hover:shadow-[inset_0_-2px_3px_rgba(0,0,0,.3),0_0_0_5px_var(--glow)] group-focus-visible:shadow-[inset_0_-2px_3px_rgba(0,0,0,.3),0_0_0_5px_var(--glow)]',
+                  )}
+                />
+                <span className="pointer-events-none absolute bottom-[calc(var(--plinth-h)/2)] left-1/2 -translate-x-1/2 translate-y-1/2 font-mono text-[10px] leading-normal tracking-[.18em] text-white/55">
+                  {p + 1}
+                </span>
+              </button>
+            );
+          })}
           {Array.from({ length: n }, (_, i) => n - i).map((size) => (
-            <div key={`${n}-${size}`} className={`disc${heldTop === size ? ' held' : ''}`} style={discStyle(size)}>
+            <div
+              key={`${n}-${size}`}
+              className={cn(
+                'pointer-events-none absolute flex h-(--disc-h) -translate-x-1/2 items-center justify-center rounded-full font-mono text-[length:calc(var(--disc-h)*.46)] font-medium text-disc-fg',
+                'transition-[left,bottom,box-shadow] duration-[var(--t,150ms)] ease-in-out motion-reduce:transition-none',
+                heldTop === size
+                  ? 'shadow-[0_6px_14px_var(--shadow),inset_0_-2px_0_rgba(0,0,0,.16),inset_0_2px_0_rgba(255,255,255,.16),0_0_0_3px_var(--glow)]'
+                  : 'shadow-[0_1px_2px_var(--shadow),inset_0_-2px_0_rgba(0,0,0,.16),inset_0_2px_0_rgba(255,255,255,.16)]',
+              )}
+              style={discStyle(size)}
+            >
               {size}
             </div>
           ))}
         </div>
-        <div className="readout">
-          <div className="cell">
-            <div className="k">이동 횟수</div>
-            <div className="v">
-              {g.moves} <small>/ {best}</small>
+        <div className="grid grid-cols-2 border-t border-line bg-panel sm:grid-cols-4">
+          {readout.map((c, i) => (
+            <div key={c.k} className={cn('px-3 pt-2.5 pb-3 sm:px-4 sm:pt-3 sm:pb-3.5', cellBorder[i])}>
+              <div className={labelText}>{c.k}</div>
+              <div
+                className={cn(
+                  'mt-0.5 font-mono text-lg leading-tight text-ink tabular-nums sm:text-[22px]',
+                  c.k === '상태' && 'pt-1 font-sans text-[15px] leading-tight sm:text-[15px]',
+                  c.k === '상태' && done && 'font-semibold text-brass',
+                )}
+              >
+                {c.v}
+              </div>
             </div>
-          </div>
-          <div className="cell">
-            <div className="k">최소 횟수</div>
-            <div className="v">{formula(n)}</div>
-          </div>
-          <div className="cell">
-            <div className="k">시간</div>
-            <div className="v">
-              {seconds(g.elapsed)}
-              <small>초</small>
-            </div>
-          </div>
-          <div className="cell">
-            <div className="k">상태</div>
-            <div className={`v${done ? ' win' : ''}`} id="status">
-              {status}
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
-      <div className="controls">
-        <div className="group">
-          <span>원반 수</span>
-          <div className="seg" role="group" aria-label="원반 수">
+      <div className="flex flex-wrap items-end gap-x-7 gap-y-5">
+        <div className="flex flex-col gap-[7px]">
+          <span className={labelText}>원반 수</span>
+          <Seg label="원반 수">
             {DISC_COUNTS.map((c) => (
-              <button key={c} aria-pressed={c === n} onClick={() => changeCount(c)}>
+              <SegButton key={c} selected={c === n} aria-pressed={c === n} onClick={() => changeCount(c)}>
                 {c}
-              </button>
+              </SegButton>
             ))}
-          </div>
+          </Seg>
         </div>
-        <div className="group">
-          <span>속도</span>
-          <div className="seg" role="group" aria-label="자동 풀이 속도">
+        <div className="flex flex-col gap-[7px]">
+          <span className={labelText}>속도</span>
+          <Seg label="자동 풀이 속도">
             {SPEEDS.map((s) => (
-              <button key={s.ms} aria-pressed={s.ms === speed} onClick={() => setSpeed(s.ms)}>
+              <SegButton key={s.ms} selected={s.ms === speed} aria-pressed={s.ms === speed} onClick={() => setSpeed(s.ms)}>
                 {s.label}
-              </button>
+              </SegButton>
             ))}
-          </div>
+          </Seg>
         </div>
-        <div className="group">
-          <span>조작</span>
-          <div className="row">
-            <button className="btn primary" onClick={() => (g.auto ? stopAuto() : runAuto())}>
+        <div className="flex flex-col gap-[7px]">
+          <span className={labelText}>조작</span>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="primary" onClick={() => (g.auto ? stopAuto() : runAuto())}>
               {g.auto ? '멈추기' : '자동 풀이'}
-            </button>
-            <button className="btn" disabled={g.busy || g.auto || g.history.length === 0} onClick={undo}>
+            </Button>
+            <Button disabled={g.busy || g.auto || g.history.length === 0} onClick={undo}>
               되돌리기
-            </button>
-            <button className="btn" onClick={() => build(n)}>
-              처음부터
-            </button>
+            </Button>
+            <Button onClick={() => build(n)}>처음부터</Button>
           </div>
         </div>
       </div>
