@@ -8,13 +8,14 @@ import { supabase } from './supabase';
 //  - 누가 들어와 있는지는 presence 로, 시작·이동·완료는 broadcast 로 주고받는다
 //  - 먼저 들어온 사람이 방장이다. 방장이 나가면 남은 사람이 방장이 된다
 //  - 둘이 같은 순간 Ready 5 부터 세고, 먼저 다 옮긴 사람이 이긴다
-//  - 게임 중에 나가거나 연결이 끊기면 진 것으로 본다
+//  - 게임 중에 [중지]하거나, 나가거나, 연결이 끊기면 진 것으로 본다
 
 export type DuelPhase = 'off' | 'connecting' | 'waiting' | 'ready' | 'playing' | 'done';
 
 export interface DuelResult {
   win: boolean;
-  reason: 'finish' | 'left';
+  // finish: 먼저 다 옮김, left: 나가거나 끊김, gaveup: [중지]로 기권
+  reason: 'finish' | 'left' | 'gaveup';
   myMs: number | null;
   myMoves: number;
   oppMs: number | null;
@@ -186,6 +187,19 @@ export function useDuel(opts: Options) {
       setOppMoves(payload.moves);
     });
 
+    ch.on('broadcast', { event: 'forfeit' }, ({ payload }) => {
+      if (payload.round !== round.current || phaseRef.current !== 'playing') return;
+      finishWith({
+        win: true,
+        reason: 'gaveup',
+        myMs: null,
+        myMoves: myMoves.current,
+        oppMs: null,
+        oppMoves: oppMovesRef.current,
+        oppName: lastOpp.current,
+      });
+    });
+
     ch.on('broadcast', { event: 'finish' }, ({ payload }) => {
       if (payload.round !== round.current) return;
       theirs.current = { ms: payload.ms, moves: payload.moves };
@@ -252,6 +266,21 @@ export function useDuel(opts: Options) {
     send('move', { moves, round: round.current });
   }
 
+  // [중지]: 대결 중이면 기권. 상대가 이긴다
+  function giveUp() {
+    if (phaseRef.current !== 'playing') return;
+    send('forfeit', { round: round.current });
+    finishWith({
+      win: false,
+      reason: 'gaveup',
+      myMs: null,
+      myMoves: myMoves.current,
+      oppMs: null,
+      oppMoves: oppMovesRef.current,
+      oppName: lastOpp.current,
+    });
+  }
+
   function reportFinish(ms: number, moves: number) {
     if (phaseRef.current !== 'playing') return;
     mine.current = { ms, moves };
@@ -286,6 +315,7 @@ export function useDuel(opts: Options) {
     sendConfig,
     reportMove,
     reportFinish,
+    giveUp,
   };
 }
 

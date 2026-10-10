@@ -514,6 +514,16 @@ export default function HanoiGame() {
     setRankDiscs(count);
   }
 
+  // [중지]: 혼자 하기는 시간을 멈추고 [준비] 상태로 되돌린다(기록 없음). 둘이 하기는 기권
+  function stopGame() {
+    if (modeRef.current === 'duel') {
+      duel.giveUp();
+      return;
+    }
+    build(game.current.n);
+    say(null, '게임을 중지했어요', '[준비]를 누르면 다시 시작해요');
+  }
+
   function switchMode(next: 'solo' | 'duel') {
     if (next === mode) return;
     if (mode === 'duel') duel.leave();
@@ -556,6 +566,9 @@ export default function HanoiGame() {
   else if (waiting(g)) status = { label: '준비 중' };
   else status = { label: '진행 중' };
   const statusTitle = done && mode === 'solo' ? (g.moves === best ? '최적 풀이' : '완성') : '상태';
+  // 진행 중(Ready 를 세는 동안 포함)에만 [중지]를 보인다
+  const running =
+    mode === 'duel' ? duel.phase === 'playing' && !g.locked : g.started && !done && !g.auto;
   const countLocked = mode === 'duel' && (!duel.isHost || duel.phase === 'playing' || duel.phase === 'off');
 
   const heldTop = g.held !== null ? g.pegs[g.held][g.pegs[g.held].length - 1] : null;
@@ -675,7 +688,12 @@ export default function HanoiGame() {
       <div className="rounded border border-line bg-panel px-3 pt-3 shadow-[0_1px_0_var(--shadow)] sm:px-[18px] sm:pt-[18px]">
         {/* 시작 카운트다운. 자리를 늘 비워 두어 숫자가 나타나고 사라져도 게임판이 움직이지 않는다 */}
         <div className="mb-1.5 flex min-h-8 flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-          <div className="flex h-6 items-center" aria-live="polite">
+          <div className="flex h-7 items-center gap-2" aria-live="polite">
+            {running && (
+              <Button onClick={stopGame} className="px-2.5 py-0.5 text-[13px]/[1.5]">
+                중지
+              </Button>
+            )}
             {g.ready !== null && (
               <span
                 key={g.ready}

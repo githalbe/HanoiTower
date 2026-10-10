@@ -130,13 +130,31 @@ export default function DuelPanel({ duel, player, discs, needPlayer }: Props) {
 
   // done
   const r = duel.result!;
-  const me = r.myMs !== null ? `${seconds(r.myMs)}초 (${r.myMoves}번)` : `미완료 (${r.myMoves} / ${best} 이동)`;
+  const gaveUp = r.reason === 'gaveup';
+  const me =
+    r.myMs !== null
+      ? `${seconds(r.myMs)}초 (${r.myMoves}번)`
+      : gaveUp && !r.win
+        ? `중지 (${r.myMoves} / ${best} 이동)`
+        : `미완료 (${r.myMoves} / ${best} 이동)`;
   const opp =
     r.oppMs !== null
       ? `${seconds(r.oppMs)}초 (${r.oppMoves}번)`
       : r.reason === 'left'
         ? '나감'
-        : `미완료 (${r.oppMoves} / ${best} 이동)`;
+        : gaveUp && r.win
+          ? `중지 (${r.oppMoves} / ${best} 이동)`
+          : `미완료 (${r.oppMoves} / ${best} 이동)`;
+  const why =
+    r.reason === 'left'
+      ? `${r.oppName} 님이 나가서 이겼어요.`
+      : gaveUp
+        ? r.win
+          ? `${r.oppName} 님이 중지해서 이겼어요.`
+          : '중지해서 졌어요.'
+        : r.win
+          ? '먼저 다 옮겼어요.'
+          : '상대가 먼저 다 옮겼어요.';
   return (
     <div className={cn(box, 'flex flex-col gap-2.5')}>
       {vs}
@@ -145,7 +163,7 @@ export default function DuelPanel({ duel, player, discs, needPlayer }: Props) {
           {r.win ? '승리!' : '패배'}
         </span>
         <span>
-          {r.reason === 'left' ? `${r.oppName} 님이 나가서 이겼어요.` : r.win ? '먼저 다 옮겼어요.' : '상대가 먼저 다 옮겼어요.'}
+          {why}
         </span>
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 font-mono text-[13px]">
