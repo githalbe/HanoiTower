@@ -99,6 +99,15 @@ export default function HelpButton() {
             </p>
             <p className="mt-1.5">[자동 풀이]를 누르면 원반 3개짜리를 푸는 모습을 보여 줍니다.</p>
           </section>
+
+          <section>
+            <h3 className={sectionTitle}>둘이 하기</h3>
+            <p>
+              [둘이 하기]에서 한 사람이 [방 만들기]를 누르고 나온 숫자 4자리를 친구에게 알려 줍니다. 친구는 그 코드를
+              넣고 [참가]를 누릅니다. 방장이 원반 수를 고르고 [대결 시작]을 누르면 둘 다 Ready 5부터 세고, 먼저 다 옮긴
+              사람이 이깁니다. 대결 중에 나가면 집니다. 대결 기록은 랭킹에 올라가지 않습니다.
+            </p>
+          </section>
         </div>
       </dialog>
     </>

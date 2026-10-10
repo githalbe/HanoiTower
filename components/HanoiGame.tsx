@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
+import DuelPanel from './DuelPanel';
 import Leaderboard, { type Result } from './Leaderboard';
-import { Button, labelText } from './ui';
+import { Button, Seg, SegButton, labelText } from './ui';
+import { useDuel } from '@/lib/duel';
 import { DISC_COUNTS, minMoves, seconds, solve, type Move } from '@/lib/hanoi';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +53,8 @@ interface Game {
   started: boolean;
   // 시작 전 세는 수. 5 → 1 동안은 못 옮기고, 0 이 되면 시간이 가기 시작한다. 다 세면 null
   ready: number | null;
+  // 둘이 하기에서 승부가 나면 더는 못 옮기게 잠근다
+  locked: boolean;
   // 새 판을 깔 때 한 번은 미끄러지지 않고 제자리에 놓는다
   instant: boolean;
 }
@@ -75,6 +79,7 @@ function newGame(n: number): Game {
     pending: 0,
     started: false,
     ready: null,
+    locked: false,
     instant: true,
   };
 }
@@ -129,6 +134,10 @@ export default function HanoiGame() {
   const playerRef = useRef(player);
   playerRef.current = player;
   const nameInput = useRef<HTMLInputElement>(null);
+  // 혼자 하기 / 둘이 하기
+  const [mode, setMode] = useState<'solo' | 'duel'>('solo');
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   const pegRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const stageRef = useRef<HTMLDivElement>(null);
   const clock = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -137,6 +146,31 @@ export default function HanoiGame() {
 
   const g = game.current;
   const n = g.n;
+
+  const duel = useDuel({
+    player,
+    discs: n,
+    onConfig: (d) => {
+      build(d);
+      setRankDiscs(d);
+    },
+    onStart: (d) => {
+      build(d);
+      setRankDiscs(d);
+      showBoard();
+      startCountdown();
+    },
+    onEnd: () => {
+      const cur = game.current;
+      cur.locked = true;
+      cur.held = null;
+      stopClock();
+      stopCountdown();
+      redraw();
+    },
+  });
+  const duelRef = useRef(duel);
+  duelRef.current = duel;
 
   // 원반 수와 화면 폭에 맞춰 무대 높이와 원반 두께를 정한다
   const discH = Math.max(12, Math.min(mobile ? 22 : 24, Math.floor((mobile ? 160 : 210) / n)));
@@ -271,6 +305,14 @@ export default function HanoiGame() {
 
   // 아직 옮길 수 없으면 까닭을 말풍선으로 알리고 true
   function notYet(cur: Game) {
+    if (cur.locked) {
+      say(null, '승부가 났어요', '방장이 [다시 대결]을 누르면 새로 시작해요');
+      return true;
+    }
+    if (!cur.started && modeRef.current === 'duel') {
+      say(null, '아직 시작 전이에요', '방장이 [대결 시작]을 누르면 Ready 5부터 셉니다');
+      return true;
+    }
     if (!cur.started) {
       if (needPlayer()) return true;
       say(null, '먼저 [준비]를 눌러 주세요', '상태 칸의 [준비]를 누르면 Ready 5부터 세요');
@@ -319,6 +361,11 @@ export default function HanoiGame() {
     if (cur.startAt) cur.elapsed = performance.now() - cur.startAt;
     stopClock();
     redraw();
+    // 둘이 하기 기록은 승부만 가리고 랭킹에는 올리지 않는다
+    if (modeRef.current === 'duel') {
+      duelRef.current.reportFinish(Math.round(cur.elapsed), cur.moves);
+      return;
+    }
     if (!cur.usedAuto) setResult({ discs: cur.n, moves: cur.moves, ms: Math.round(cur.elapsed) });
   }
 
@@ -362,6 +409,7 @@ export default function HanoiGame() {
       }
       startClock();
       await move(from, to, true);
+      if (modeRef.current === 'duel' && game.current === cur) duelRef.current.reportMove(cur.moves);
       checkWin();
     });
   }
@@ -429,11 +477,7 @@ export default function HanoiGame() {
     const fresh = game.current.n === AUTO_DISCS && !game.current.started && game.current.moves === 0;
     build(AUTO_DISCS);
     setRankDiscs(AUTO_DISCS);
-    // 폰에서 버튼을 누르려고 내려와 있으면 게임판이 화면 밖일 수 있다. 푸는 모습이 보이게 끌어올린다
-    const board = stageRef.current?.getBoundingClientRect();
-    if (board && (board.top < 0 || board.bottom > innerHeight)) {
-      stageRef.current!.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'center' });
-    }
+    showBoard();
     const cur = game.current;
     const token = ++cur.autoToken;
     cur.auto = true;
@@ -449,9 +493,34 @@ export default function HanoiGame() {
     if (token === game.current.autoToken) stopAuto();
   }
 
+  // 폰에서 버튼을 누르려고 내려와 있으면 게임판이 화면 밖일 수 있다. 판이 보이게 끌어올린다
+  function showBoard() {
+    const board = stageRef.current?.getBoundingClientRect();
+    if (board && (board.top < 0 || board.bottom > innerHeight)) {
+      stageRef.current!.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'center' });
+    }
+  }
+
   function changeCount(count: number) {
+    if (modeRef.current === 'duel') {
+      // 둘이 하기에서는 방장만, 대결 중이 아닐 때 바꾼다
+      if (!duel.isHost || duel.phase === 'playing') return;
+      build(count);
+      setRankDiscs(count);
+      duel.sendConfig(count);
+      return;
+    }
     build(count);
     setRankDiscs(count);
+  }
+
+  function switchMode(next: 'solo' | 'duel') {
+    if (next === mode) return;
+    if (mode === 'duel') duel.leave();
+    stopAuto();
+    setMode(next);
+    modeRef.current = next;
+    build(game.current.n);
   }
 
   const pressRef = useRef(press);
@@ -476,12 +545,18 @@ export default function HanoiGame() {
   const done = isDone(g);
   // 상태 칸의 버튼: 준비 → (Ready 5…0) → 진행 중 → 원반을 옮기면 처음부터
   let status: { label: string; onClick?: () => void };
-  if (g.auto) status = { label: '자동 풀이 중' };
+  if (mode === 'duel') {
+    if (duel.phase === 'done') status = { label: duel.result?.win ? '승리' : '패배' };
+    else if (duel.phase === 'playing') status = { label: waiting(g) ? '준비 중' : '진행 중' };
+    else if (duel.phase === 'ready') status = { label: '시작 대기' };
+    else status = { label: '대기 중' };
+  } else if (g.auto) status = { label: '자동 풀이 중' };
   else if (g.moves > 0 || done) status = { label: '처음부터', onClick: restart };
   else if (!g.started) status = { label: '준비', onClick: begin };
   else if (waiting(g)) status = { label: '준비 중' };
   else status = { label: '진행 중' };
-  const statusTitle = done ? (g.moves === best ? '최적 풀이' : '완성') : '상태';
+  const statusTitle = done && mode === 'solo' ? (g.moves === best ? '최적 풀이' : '완성') : '상태';
+  const countLocked = mode === 'duel' && (!duel.isHost || duel.phase === 'playing' || duel.phase === 'off');
 
   const heldTop = g.held !== null ? g.pegs[g.held][g.pegs[g.held].length - 1] : null;
   const liftY = stageH - discH - 4;
@@ -523,9 +598,10 @@ export default function HanoiGame() {
         <select
           value={n}
           onChange={(e) => changeCount(+e.target.value)}
+          disabled={countLocked}
           aria-label="원반 수"
           // 16px 보다 작으면 아이폰이 고를 때 화면을 확대한다
-          className="w-full cursor-pointer rounded-[3px] border border-line bg-panel py-0.5 pr-1 pl-2 font-mono text-base text-ink focus-visible:outline-2 focus-visible:outline-brass sm:w-auto sm:text-[18px]"
+          className="w-full cursor-pointer rounded-[3px] border border-line bg-panel py-0.5 pr-1 pl-2 font-mono text-base text-ink focus-visible:outline-2 focus-visible:outline-brass disabled:cursor-default disabled:opacity-70 sm:w-auto sm:text-[18px]"
         >
           {DISC_COUNTS.map((c) => (
             <option key={c} value={c}>
@@ -571,6 +647,31 @@ export default function HanoiGame() {
 
   return (
     <>
+      <div className="flex flex-col gap-3">
+        <div className="flex">
+          <Seg label="게임 방식" role="tablist">
+            {(
+              [
+                ['solo', '혼자 하기'],
+                ['duel', '둘이 하기'],
+              ] as const
+            ).map(([m, label]) => (
+              <SegButton
+                key={m}
+                role="tab"
+                selected={mode === m}
+                aria-selected={mode === m}
+                onClick={() => switchMode(m)}
+                className="px-4 font-sans text-sm"
+              >
+                {label}
+              </SegButton>
+            ))}
+          </Seg>
+        </div>
+        {mode === 'duel' && <DuelPanel duel={duel} player={player} discs={n} needPlayer={needPlayer} />}
+      </div>
+
       <div className="rounded border border-line bg-panel px-3 pt-3 shadow-[0_1px_0_var(--shadow)] sm:px-[18px] sm:pt-[18px]">
         {/* 시작 카운트다운. 자리를 늘 비워 두어 숫자가 나타나고 사라져도 게임판이 움직이지 않는다 */}
         <div className="mb-1.5 flex min-h-8 flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
@@ -727,14 +828,16 @@ export default function HanoiGame() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-x-7 gap-y-5">
-        <div className="flex flex-col gap-[7px]">
-          <span className={labelText}>원반 3개로 보기</span>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => (g.auto ? stopAuto() : runAuto())}>{g.auto ? '멈추기' : '자동 풀이'}</Button>
+      {mode === 'solo' && (
+        <div className="flex flex-wrap items-end gap-x-7 gap-y-5">
+          <div className="flex flex-col gap-[7px]">
+            <span className={labelText}>원반 3개로 보기</span>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => (g.auto ? stopAuto() : runAuto())}>{g.auto ? '멈추기' : '자동 풀이'}</Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <Leaderboard
         discs={rankDiscs}
