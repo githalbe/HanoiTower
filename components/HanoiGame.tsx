@@ -47,6 +47,8 @@ interface Game {
   // 눌러 둔 이동을 차례로 처리한다. 앞 이동이 끝나기 전에 다음 숫자를 눌러도 잃지 않는다
   queue: Promise<void>;
   pending: number;
+  // 상태 칸의 [준비] 를 눌렀는지. 누르기 전에는 원반을 옮길 수 없다
+  started: boolean;
   // 시작 전 세는 수. 5 → 1 동안은 못 옮기고, 0 이 되면 시간이 가기 시작한다. 다 세면 null
   ready: number | null;
   // 새 판을 깔 때 한 번은 미끄러지지 않고 제자리에 놓는다
@@ -71,6 +73,7 @@ function newGame(n: number): Game {
     bubble: null,
     queue: Promise.resolve(),
     pending: 0,
+    started: false,
     ready: null,
     instant: true,
   };
@@ -81,9 +84,9 @@ function isDone(g: Game) {
   return g.pegs[1].length === g.n || g.pegs[2].length === g.n;
 }
 
-// Ready 카운트다운을 잠시 꺼 둔다. 다시 쓰려면 true 로 바꾼다
-const USE_COUNTDOWN = false;
 const READY_FROM = 5;
+// 자동 풀이는 원반 3개짜리로만 보여 준다
+const AUTO_DISCS = 3;
 
 function waiting(g: Game) {
   return g.ready !== null && g.ready > 0;
@@ -151,9 +154,7 @@ export default function HanoiGame() {
     return () => cancelAnimationFrame(id);
   });
 
-  // 처음 열었을 때도 Ready 부터 센다
   useEffect(() => {
-    startCountdown();
     return () => {
       stopClock();
       stopCountdown();
@@ -167,8 +168,8 @@ export default function HanoiGame() {
 
   function startCountdown() {
     stopCountdown();
-    if (!USE_COUNTDOWN) return;
     const cur = game.current;
+    cur.started = true;
     cur.ready = READY_FROM;
     redraw();
     countdown.current = setInterval(() => {
@@ -206,19 +207,33 @@ export default function HanoiGame() {
     }, 100);
   }
 
-  function build(count: number, withCountdown = true) {
+  function build(count: number) {
     stopClock();
     stopCountdown();
     const prev = game.current;
     game.current = newGame(count);
     game.current.autoToken = prev.autoToken + 1;
     setResult(null);
-    if (withCountdown) startCountdown();
-    else redraw();
+    redraw();
   }
 
-  function notYet() {
-    say(null, `아직 준비 중이에요`, `Ready 가 0이 되면 시작해요`);
+  // 상태 칸의 [처음부터]: 판을 처음으로 돌리고 바로 Ready 부터 다시 센다
+  function restart() {
+    build(game.current.n);
+    startCountdown();
+  }
+
+  // 아직 옮길 수 없으면 까닭을 말풍선으로 알리고 true
+  function notYet(cur: Game) {
+    if (!cur.started) {
+      say(null, '먼저 [준비]를 눌러 주세요', '상태 칸의 [준비]를 누르면 Ready 5부터 세요');
+      return true;
+    }
+    if (waiting(cur)) {
+      say(null, '아직 준비 중이에요', 'Ready 가 0이 되면 시작해요');
+      return true;
+    }
+    return false;
   }
 
   function stepTime() {
@@ -307,11 +322,7 @@ export default function HanoiGame() {
   // 마우스: 기둥을 눌러 집고, 다른 기둥을 눌러 놓는다. 같은 기둥을 다시 누르면 집기 취소
   function tap(p: number) {
     const cur = game.current;
-    if (cur.auto) return;
-    if (waiting(cur)) {
-      notYet();
-      return;
-    }
+    if (cur.auto || notYet(cur)) return;
     if (cur.held === null) {
       if (cur.busy || cur.pending) return;
       if (!cur.pegs[p].length) {
@@ -340,10 +351,7 @@ export default function HanoiGame() {
       say(null, '자동 풀이 중이에요', '멈추기를 누른 뒤 옮겨 주세요');
       return;
     }
-    if (waiting(cur)) {
-      notYet();
-      return;
-    }
+    if (notYet(cur)) return;
     if (d < 1 || d > 3) {
       cur.held = null;
       say(null, `${d}번 기둥은 없어요`, '1, 2, 3 중에서 눌러 주세요');
@@ -370,36 +378,23 @@ export default function HanoiGame() {
   }
 
   async function runAuto() {
-    // 손댄 판이면 처음 상태로 되돌린 뒤 푼다
-    const dirty = game.current.moves > 0 || game.current.pegs[0].length !== game.current.n;
-    if (dirty) build(game.current.n, false);
-    stopCountdown();
+    // 원반 3개짜리 새 판을 깔고 푸는 모습을 보여 준다
+    const fresh = game.current.n === AUTO_DISCS && !game.current.started && game.current.moves === 0;
+    build(AUTO_DISCS);
+    setRankDiscs(AUTO_DISCS);
     const cur = game.current;
-    cur.ready = null;
     const token = ++cur.autoToken;
     cur.auto = true;
     cur.usedAuto = true;
     cur.held = null;
     cur.bubble = null;
     redraw();
-    if (dirty) await wait(prefersReducedMotion() ? 0 : 240);
+    if (!fresh) await wait(prefersReducedMotion() ? 0 : 240);
     for (const [a, b] of solve(cur.n)) {
       if (token !== game.current.autoToken) return;
       await move(a, b, true);
     }
     if (token === game.current.autoToken) stopAuto();
-  }
-
-  function undo() {
-    const cur = game.current;
-    if (cur.busy || cur.auto || cur.pending || !cur.history.length) return;
-    const [from, to] = cur.history.pop()!;
-    cur.held = null;
-    cur.bubble = null;
-    move(to, from, false).then(() => {
-      cur.moves = Math.max(0, cur.moves - 1);
-      redraw();
-    });
   }
 
   function changeCount(count: number) {
@@ -427,13 +422,14 @@ export default function HanoiGame() {
 
   const best = minMoves(n);
   const done = isDone(g);
-  let status: string;
-  if (done) status = g.moves === best ? '최적 풀이' : '완성';
-  else if (g.auto) status = '자동 풀이 중';
-  else if (waiting(g)) status = '준비 중';
-  else if (g.held !== null) status = `${g.held + 1}번에서 집음`;
-  else if (g.moves > 0 || g.startAt) status = '진행 중';
-  else status = '시작 전';
+  // 상태 칸의 버튼: 준비 → (Ready 5…0) → 진행 중 → 원반을 옮기면 처음부터
+  let status: { label: string; onClick?: () => void };
+  if (g.auto) status = { label: '자동 풀이 중' };
+  else if (g.moves > 0 || done) status = { label: '처음부터', onClick: restart };
+  else if (!g.started) status = { label: '준비', onClick: startCountdown };
+  else if (waiting(g)) status = { label: '준비 중' };
+  else status = { label: '진행 중' };
+  const statusTitle = done ? (g.moves === best ? '최적 풀이' : '완성') : '상태';
 
   const heldTop = g.held !== null ? g.pegs[g.held][g.pegs[g.held].length - 1] : null;
   const liftY = stageH - discH - 4;
@@ -487,7 +483,19 @@ export default function HanoiGame() {
         </>
       ),
     },
-    { k: '상태', v: status },
+    {
+      k: statusTitle,
+      v: (
+        <Button
+          variant={status.onClick ? 'primary' : 'default'}
+          disabled={!status.onClick}
+          onClick={status.onClick}
+          className="w-full px-3 py-1 text-[15px]/[1.5] disabled:text-ink-2 disabled:opacity-100 sm:w-auto"
+        >
+          {status.label}
+        </Button>
+      ),
+    },
   ];
   // 폰에서는 2×2, 넓으면 한 줄에 넷
   const cellBorder = ['', 'border-l', 'border-t sm:border-t-0 sm:border-l', 'border-l border-t sm:border-t-0'];
@@ -495,22 +503,20 @@ export default function HanoiGame() {
   return (
     <>
       <div className="rounded border border-line bg-panel px-3 pt-3 shadow-[0_1px_0_var(--shadow)] sm:px-[18px] sm:pt-[18px]">
-        {/* 시작 카운트다운. 자리를 늘 비워 두어 숫자가 사라져도 게임판이 움직이지 않는다 */}
-        {USE_COUNTDOWN && (
-          <div className="mb-1 flex h-6 items-center" aria-live="polite">
-            {g.ready !== null && (
-              <span
-                key={g.ready}
-                className={cn(
-                  'animate-pop rounded-[3px] border border-brass px-2 font-mono text-[13px] leading-[22px] tabular-nums',
-                  g.ready > 0 ? 'text-brass' : 'bg-brass font-semibold text-panel',
+        {/* 시작 카운트다운. 자리를 늘 비워 두어 숫자가 나타나고 사라져도 게임판이 움직이지 않는다 */}
+        <div className="mb-1 flex h-6 items-center" aria-live="polite">
+          {g.ready !== null && (
+            <span
+              key={g.ready}
+              className={cn(
+                'animate-pop rounded-[3px] border border-brass px-2 font-mono text-[13px] leading-[22px] tabular-nums',
+                g.ready > 0 ? 'text-brass' : 'bg-brass font-semibold text-panel',
               )}
             >
               {g.ready > 0 ? `Ready : ${g.ready}` : 'Start!'}
             </span>
           )}
         </div>
-        )}
         <div
           className="relative h-(--stage-h) w-full touch-manipulation"
           style={
@@ -578,13 +584,12 @@ export default function HanoiGame() {
         </div>
         <div className="grid grid-cols-2 border-t border-line bg-panel sm:grid-cols-4">
           {readout.map((c, i) => (
-            <div key={c.k} className={cn('px-3 pt-2.5 pb-3 sm:px-4 sm:pt-3 sm:pb-3.5', cellBorder[i])}>
-              <div className={labelText}>{c.k}</div>
+            <div key={i} className={cn('px-3 pt-2.5 pb-3 sm:px-4 sm:pt-3 sm:pb-3.5', cellBorder[i])}>
+              <div className={cn(labelText, i === 3 && done && 'font-semibold text-brass')}>{c.k}</div>
               <div
                 className={cn(
                   'mt-0.5 font-mono text-lg leading-tight text-ink tabular-nums sm:text-[22px]',
-                  c.k === '상태' && 'pt-1 font-sans text-[15px] leading-tight sm:text-[15px]',
-                  c.k === '상태' && done && 'font-semibold text-brass',
+                  i === 3 && 'pt-0.5 font-sans',
                 )}
               >
                 {c.v}
@@ -606,15 +611,9 @@ export default function HanoiGame() {
           </Seg>
         </div>
         <div className="flex flex-col gap-[7px]">
-          <span className={labelText}>조작</span>
+          <span className={labelText}>원반 3개로 보기</span>
           <div className="flex flex-wrap gap-2">
-            <Button variant="primary" onClick={() => (g.auto ? stopAuto() : runAuto())}>
-              {g.auto ? '멈추기' : '자동 풀이'}
-            </Button>
-            <Button disabled={g.busy || g.auto || g.pending > 0 || g.history.length === 0} onClick={undo}>
-              되돌리기
-            </Button>
-            <Button onClick={() => build(n)}>처음부터</Button>
+            <Button onClick={() => (g.auto ? stopAuto() : runAuto())}>{g.auto ? '멈추기' : '자동 풀이'}</Button>
           </div>
         </div>
       </div>

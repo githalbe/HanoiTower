@@ -80,6 +80,11 @@ export default function HelpButton() {
 
           <section>
             <h3 className={sectionTitle}>게임 방법</h3>
+            <p className="mb-1.5">
+              상태 칸의 <b className="font-semibold text-ink">[준비]</b>를 누르면 Ready 5부터 세고, 0이 되면 시간이
+              흐르며 게임이 시작됩니다. 원반을 옮긴 뒤에는 같은 자리가 <b className="font-semibold text-ink">[처음부터]</b>로
+              바뀌어 누르면 새로 시작합니다.
+            </p>
             <p>
               옮기고 싶은 원반을 먼저 누르고, 다음에 옮기고 싶은 자리의 기둥을 누르면 원반이 옮겨집니다. 이렇게 계속
               진행하고 다 옮기면 게임은 종료됩니다.
@@ -88,6 +93,7 @@ export default function HelpButton() {
               키보드로는 <b className="font-semibold text-ink">13</b>처럼 숫자 두 개를 누르면 1번 기둥에서 3번 기둥으로
               옮깁니다.
             </p>
+            <p className="mt-1.5">[자동 풀이]를 누르면 원반 3개짜리를 푸는 모습을 보여 줍니다.</p>
           </section>
         </div>
       </dialog>
