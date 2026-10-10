@@ -237,11 +237,9 @@ export default function HanoiGame() {
     return false;
   }
 
-  // 자동 풀이는 보여 주는 게 목적이라 '동작 줄이기'가 켜진 폰에서도 한 수씩 쉬어 가며 둔다
-  // (그때는 미끄러지지 않고 칸을 건너뛰듯 옮겨진다)
+  // 원반이 움직이는 모습이 곧 게임이라, 폰의 '동작 줄이기'(애니메이션 제거) 설정과 상관없이 늘 미끄러지게 옮긴다
   function stepTime() {
-    if (game.current.auto) return AUTO_STEP_MS;
-    return prefersReducedMotion() ? 0 : 140;
+    return game.current.auto ? AUTO_STEP_MS : 140;
   }
 
   async function move(from: number, to: number, record: boolean) {
@@ -579,7 +577,7 @@ export default function HanoiGame() {
               key={`${n}-${size}`}
               className={cn(
                 'pointer-events-none absolute flex h-(--disc-h) -translate-x-1/2 items-center justify-center rounded-full font-mono text-[length:calc(var(--disc-h)*.46)] font-medium text-disc-fg',
-                'transition-[left,bottom,box-shadow] duration-[var(--t,150ms)] ease-in-out motion-reduce:transition-none',
+                'transition-[left,bottom,box-shadow] duration-[var(--t,150ms)] ease-in-out',
                 heldTop === size
                   ? 'shadow-[0_6px_14px_var(--shadow),inset_0_-2px_0_rgba(0,0,0,.16),inset_0_2px_0_rgba(255,255,255,.16),0_0_0_3px_var(--glow)]'
                   : 'shadow-[0_1px_2px_var(--shadow),inset_0_-2px_0_rgba(0,0,0,.16),inset_0_2px_0_rgba(255,255,255,.16)]',
