@@ -26,6 +26,11 @@ export default function Home() {
         <p className="font-mono text-[13px] break-all text-brass tabular-nums">18,446,744,073,709,551,615회</p>
         <p>가 필요하고, 1초에 한 번씩 쉬지 않고 옮겨도 약 5,850억 년이 걸립니다. 우주 나이의 마흔 배쯤 됩니다.</p>
       </div>
+
+      <footer className="flex flex-wrap justify-center gap-x-4 gap-y-1 border-t border-line pt-4 text-[13px] text-ink-3">
+        <span>기획 : BrainLove</span>
+        <span>개발 : claude</span>
+      </footer>
     </div>
   );
 }
