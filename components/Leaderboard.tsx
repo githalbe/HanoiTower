@@ -5,7 +5,7 @@ import { DISC_COUNTS, seconds } from '@/lib/hanoi';
 import { fetchTop, submitScore } from '@/lib/scores';
 import { supabase, type Score } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import { Button, Seg, SegButton, labelText } from './ui';
+import { Button, En, EnLine, Seg, SegButton, labelText } from './ui';
 
 export interface Result {
   discs: number;
@@ -31,7 +31,7 @@ export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted,
   const [reload, setReload] = useState(0);
   const [myId, setMyId] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
-  const [notice, setNotice] = useState<{ text: string; failed: boolean } | null>(null);
+  const [notice, setNotice] = useState<{ text: string; en: string; failed: boolean } | null>(null);
   const sent = useRef<Result | null>(null);
 
   useEffect(() => {
@@ -61,18 +61,29 @@ export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted,
       const res = await submitScore({ name: player, ...r });
       setMyId(res.id);
       const now = `원반 ${r.discs}개, ${r.moves}번, ${seconds(r.ms)}초`;
+      const nowEn = `${r.discs} discs, ${r.moves} moves, ${seconds(r.ms)}s`;
       const text =
         res.outcome === 'new'
           ? `${player} 님 기록(${now})을 랭킹에 올렸어요.`
           : res.outcome === 'better'
             ? `${player} 님 최고 기록을 ${now}로 바꿨어요.`
             : `이번 기록(${r.moves}번, ${seconds(r.ms)}초)은 ${player} 님 최고 기록(${res.bestMoves}번, ${seconds(res.bestMs)}초)보다 좋지 않아 랭킹은 그대로예요.`;
-      setNotice({ text, failed: false });
+      const en =
+        res.outcome === 'new'
+          ? `${player}'s record (${nowEn}) is now on the ranking.`
+          : res.outcome === 'better'
+            ? `${player}'s best record is now ${nowEn}.`
+            : `This run (${r.moves} moves, ${seconds(r.ms)}s) is not better than ${player}'s best (${res.bestMoves} moves, ${seconds(res.bestMs)}s), so the ranking stays the same.`;
+      setNotice({ text, en, failed: false });
       onSubmitted();
       if (discs === r.discs) setReload((n) => n + 1);
       else onDiscsChange(r.discs);
     } catch {
-      setNotice({ text: '기록을 올리지 못했어요. 잠시 후 다시 올려 주세요.', failed: true });
+      setNotice({
+        text: '기록을 올리지 못했어요. 잠시 후 다시 올려 주세요.',
+        en: "Couldn't save your record. Please try again in a moment.",
+        failed: true,
+      });
     } finally {
       setSending(false);
     }
@@ -93,11 +104,11 @@ export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted,
     return () => clearTimeout(id);
   }, [notice]);
 
-  let empty: string | null = null;
-  if (!supabase) empty = '랭킹 서버가 아직 연결되지 않았어요.';
-  else if (failed) empty = '랭킹을 불러오지 못했어요.';
-  else if (!rows) empty = '불러오는 중…';
-  else if (!rows.length) empty = '아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요.';
+  let empty: [string, string] | null = null;
+  if (!supabase) empty = ['랭킹 서버가 아직 연결되지 않았어요.', 'The ranking server is not connected yet.'];
+  else if (failed) empty = ['랭킹을 불러오지 못했어요.', "Couldn't load the ranking."];
+  else if (!rows) empty = ['불러오는 중…', 'Loading…'];
+  else if (!rows.length) empty = ['아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요.', 'No records yet. Be the first!'];
 
   const th = cn(labelText, 'border-b border-line px-2 py-1.5 text-left font-normal');
 
@@ -109,6 +120,7 @@ export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted,
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5">
         <h2 id="boardTitle" className="font-serif text-[19px] font-bold">
           랭킹
+          <span className="font-sans text-[15px] font-normal text-ink-3"> / Ranking</span>
         </h2>
         <Seg label="랭킹 원반 수" role="tablist">
           {DISC_COUNTS.map((c) => (
@@ -125,7 +137,11 @@ export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted,
           ))}
         </Seg>
       </div>
-      <div className="font-mono text-[11px] tracking-[.12em] text-ink-3">원반 {discs}개 · 적은 이동, 빠른 시간 순</div>
+      <div className="font-mono text-[11px] tracking-[.12em] text-ink-3">원반 {discs}개 · 적은 이동, 빠른 시간 순
+        <EnLine className="tracking-normal">
+          {discs} discs · fewest moves, then fastest time
+        </EnLine>
+      </div>
 
       {notice && (
         <div
@@ -135,10 +151,14 @@ export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted,
             notice.failed ? 'bg-panel-2 text-danger' : 'bg-panel-2 text-ink-2',
           )}
         >
-          <p className="flex-[1_1_220px]">{notice.text}</p>
+          <p className="flex-[1_1_220px]">
+            {notice.text}
+            <EnLine>{notice.en}</EnLine>
+          </p>
           {notice.failed && result && (
             <Button variant="primary" disabled={sending} onClick={() => send(result)}>
               다시 올리기
+              <En>Retry</En>
             </Button>
           )}
         </div>
@@ -148,16 +168,23 @@ export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted,
         <thead>
           <tr>
             <th className={cn(th, 'text-right')}>#</th>
-            <th className={th}>이름</th>
-            <th className={cn(th, 'text-right')}>이동</th>
-            <th className={cn(th, 'text-right')}>시간</th>
+            <th className={th}>
+              이름<En>Name</En>
+            </th>
+            <th className={cn(th, 'text-right')}>
+              이동<En>Moves</En>
+            </th>
+            <th className={cn(th, 'text-right')}>
+              시간<En>Time</En>
+            </th>
           </tr>
         </thead>
         <tbody className={cn('transition-opacity [&>tr:last-child>td]:border-b-0', loading && !empty && 'opacity-50')}>
           {empty ? (
             <tr>
               <td className="px-2 py-4 text-center text-ink-3" colSpan={4}>
-                {empty}
+                {empty[0]}
+                <EnLine>{empty[1]}</EnLine>
               </td>
             </tr>
           ) : (

@@ -1,6 +1,16 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
+// 짧은 글자 옆에 붙이는 영어: "한국어 / English". 바탕색과 상관없이 보이게 색 대신 흐리기로 낮춘다
+export function En({ children }: { children: ReactNode }) {
+  return <span className="font-normal opacity-70"> / {children}</span>;
+}
+
+// 긴 글 아래에 붙이는 영어 한 줄
+export function EnLine({ children, className }: { children: ReactNode; className?: string }) {
+  return <span className={cn('mt-0.5 block text-[0.88em] leading-snug opacity-70', className)}>{children}</span>;
+}
+
 // 칸 이름처럼 작게 대문자로 깔리는 글씨
 export const labelText = 'font-mono text-[10px] uppercase tracking-[.16em] text-ink-3';
 

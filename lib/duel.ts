@@ -54,6 +54,7 @@ export function useDuel(opts: Options) {
   const [opponent, setOpponent] = useState<string | null>(null);
   const [oppMoves, setOppMoves] = useState(0);
   const [result, setResult] = useState<DuelResult | null>(null);
+  // "한국어|English"
   const [error, setError] = useState('');
 
   const o = useRef(opts);
@@ -110,11 +111,11 @@ export function useDuel(opts: Options) {
 
   function join(roomCode: string) {
     if (!supabase) {
-      setError('대결 서버가 연결되지 않았어요');
+      setError('대결 서버가 연결되지 않았어요|The match server is not connected');
       return;
     }
     if (!/^\d{4}$/.test(roomCode)) {
-      setError('방 코드는 숫자 4자리예요');
+      setError('방 코드는 숫자 4자리예요|The room code is 4 digits');
       return;
     }
     leave();
@@ -136,7 +137,7 @@ export function useDuel(opts: Options) {
       if (me < 0) return;
       if (me >= 2) {
         leave();
-        setError('이미 두 사람이 들어가 있는 방이에요');
+        setError('이미 두 사람이 들어가 있는 방이에요|This room already has two players');
         return;
       }
       const host = me === 0;
@@ -236,7 +237,7 @@ export function useDuel(opts: Options) {
       if (status === 'SUBSCRIBED') {
         ch.track({ name: o.current.player, joinedAt: Date.now() });
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        setError('방에 연결하지 못했어요. 잠시 후 다시 해 주세요');
+        setError("방에 연결하지 못했어요. 잠시 후 다시 해 주세요|Couldn't connect to the room. Please try again shortly");
         leave();
       }
     });

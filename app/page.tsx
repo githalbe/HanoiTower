@@ -1,5 +1,6 @@
 import HanoiGame from '@/components/HanoiGame';
 import HelpButton from '@/components/HelpButton';
+import { EnLine } from '@/components/ui';
 
 export default function Home() {
   return (
@@ -17,19 +18,34 @@ export default function Home() {
       <HanoiGame />
 
       <div className="max-w-[64ch] border-t border-line pt-[22px] text-sm/[1.6] text-ink-2 [&_p]:mb-2.5">
-        <h2 className="mb-2 font-serif text-[19px] font-bold text-ink">64개의 원반</h2>
+        <h2 className="mb-2 font-serif text-[19px] font-bold text-ink">
+          64개의 원반 <span className="font-sans text-[15px] font-normal text-ink-3">/ The 64 Discs</span>
+        </h2>
         <p>
           인도 바라나시의 어느 사원에 다이아몬드 기둥 셋과 황금 원반 예순넷이 있고, 승려들이 밤낮으로 그것을 옮기고
           있다는 이야기가 전해집니다. 마지막 원반이 제자리에 놓이는 순간 세상이 끝난다고 합니다.
+          <EnLine>
+            Legend says a temple in Varanasi, India holds three diamond pegs and sixty-four golden discs, and monks
+            move them day and night. When the last disc is in place, the world will end.
+          </EnLine>
         </p>
-        <p>다행히 시간은 넉넉합니다. 원반 64개를 옮기려면 최소</p>
-        <p className="font-mono text-[13px] break-all text-brass tabular-nums">18,446,744,073,709,551,615회</p>
-        <p>가 필요하고, 1초에 한 번씩 쉬지 않고 옮겨도 약 5,850억 년이 걸립니다. 우주 나이의 마흔 배쯤 됩니다.</p>
+        <p>
+          다행히 시간은 넉넉합니다. 원반 64개를 옮기려면 최소
+          <EnLine>Luckily, there is plenty of time. Moving 64 discs takes at least</EnLine>
+        </p>
+        <p className="font-mono text-[13px] break-all text-brass tabular-nums">18,446,744,073,709,551,615회 / moves</p>
+        <p>
+          가 필요하고, 1초에 한 번씩 쉬지 않고 옮겨도 약 5,850억 년이 걸립니다. 우주 나이의 마흔 배쯤 됩니다.
+          <EnLine>
+            Even at one move per second without rest, that is about 585 billion years, roughly forty times the age of
+            the universe.
+          </EnLine>
+        </p>
       </div>
 
       <footer className="flex flex-wrap justify-center gap-x-4 gap-y-1 border-t border-line pt-4 text-[13px] text-ink-3">
-        <span>기획 : BrainLove</span>
-        <span>개발 : claude</span>
+        <span>기획 / Planning : BrainLove</span>
+        <span>개발 / Development : claude</span>
       </footer>
     </div>
   );

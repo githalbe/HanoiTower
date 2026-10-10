@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
 import DuelPanel from './DuelPanel';
 import Leaderboard, { type Result } from './Leaderboard';
-import { Button, Seg, SegButton, labelText } from './ui';
+import { Button, En, EnLine, Seg, SegButton, labelText } from './ui';
 import { useDuel } from '@/lib/duel';
 import { DISC_COUNTS, minMoves, seconds, solve, type Move } from '@/lib/hanoi';
 import { cn } from '@/lib/utils';
@@ -24,11 +24,14 @@ interface Flying {
 }
 
 // 옮길 수 없을 때 기둥 위에 잠깐 띄우는 말풍선. peg 가 null 이면 무대 가운데 위
+// [한국어, English]
+type Text2 = [string, string];
+
 interface Bubble {
   id: number;
   peg: number | null;
-  title: string;
-  reason: string;
+  title: Text2;
+  reason: Text2;
 }
 
 interface Game {
@@ -103,12 +106,16 @@ function top(stack: number[]) {
 }
 
 // 옮길 수 없는 까닭. 옮길 수 있으면 null
-function blocked(g: Game, from: number, to: number): string | null {
-  if (from === to) return '같은 기둥으로는 옮길 수 없어요';
+function blocked(g: Game, from: number, to: number): Text2 | null {
+  if (from === to) return ['같은 기둥으로는 옮길 수 없어요', "Can't move to the same peg"];
   const moving = top(g.pegs[from]);
-  if (moving === undefined) return `${from + 1}번 기둥에 원반이 없어요`;
+  if (moving === undefined) return [`${from + 1}번 기둥에 원반이 없어요`, `Peg ${from + 1} has no disc`];
   const target = top(g.pegs[to]);
-  if (target !== undefined && target < moving) return `${moving}번 원반을 더 작은 ${target}번 원반 위에 올릴 수 없어요`;
+  if (target !== undefined && target < moving)
+    return [
+      `${moving}번 원반을 더 작은 ${target}번 원반 위에 올릴 수 없어요`,
+      `Disc ${moving} can't go on the smaller disc ${target}`,
+    ];
   return null;
 }
 
@@ -225,7 +232,11 @@ export default function HanoiGame() {
   function needPlayer() {
     if (playerRef.current) return false;
     setEditingName(true);
-    say(null, '먼저 Player 이름을 등록해 주세요', '게임판 위 이름 칸에 적고 [등록]을 눌러 주세요');
+    say(
+      null,
+      ['먼저 Player 이름을 등록해 주세요', 'Register your Player name first'],
+      ['게임판 위 이름 칸에 적고 [등록]을 눌러 주세요', 'Type it in the name box above the board and press [Save]'],
+    );
     requestAnimationFrame(() => nameInput.current?.focus());
     return true;
   }
@@ -306,20 +317,28 @@ export default function HanoiGame() {
   // 아직 옮길 수 없으면 까닭을 말풍선으로 알리고 true
   function notYet(cur: Game) {
     if (cur.locked) {
-      say(null, '승부가 났어요', '방장이 [다시 대결]을 누르면 새로 시작해요');
+      say(null, ['승부가 났어요', 'The match is over'], ['방장이 [다시 대결]을 누르면 새로 시작해요', 'The host can press [Rematch] to play again']);
       return true;
     }
     if (!cur.started && modeRef.current === 'duel') {
-      say(null, '아직 시작 전이에요', '방장이 [대결 시작]을 누르면 Ready 5부터 셉니다');
+      say(
+        null,
+        ['아직 시작 전이에요', 'Not started yet'],
+        ['방장이 [대결 시작]을 누르면 Ready 5부터 셉니다', 'Counts down from Ready 5 when the host presses [Start match]'],
+      );
       return true;
     }
     if (!cur.started) {
       if (needPlayer()) return true;
-      say(null, '먼저 [준비]를 눌러 주세요', '상태 칸의 [준비]를 누르면 Ready 5부터 세요');
+      say(
+        null,
+        ['먼저 [준비]를 눌러 주세요', 'Press [Ready] first'],
+        ['상태 칸의 [준비]를 누르면 Ready 5부터 세요', 'Press [Ready] in the Status box to count down from 5'],
+      );
       return true;
     }
     if (waiting(cur)) {
-      say(null, '아직 준비 중이에요', 'Ready 가 0이 되면 시작해요');
+      say(null, ['아직 준비 중이에요', 'Getting ready'], ['Ready 가 0이 되면 시작해요', 'Starts when Ready reaches 0']);
       return true;
     }
     return false;
@@ -381,7 +400,7 @@ export default function HanoiGame() {
     );
   }
 
-  function say(peg: number | null, title: string, reason: string) {
+  function say(peg: number | null, title: Text2, reason: Text2) {
     const cur = game.current;
     const id = ++bubbleId.current;
     cur.bubble = { id, peg, title, reason };
@@ -390,7 +409,7 @@ export default function HanoiGame() {
       if (game.current.bubble?.id !== id) return;
       game.current.bubble = null;
       redraw();
-    }, 2200);
+    }, 3200);
   }
 
   // 판이 바뀌면(새 판, 원반 수 변경) 남은 이동은 버린다
@@ -404,7 +423,7 @@ export default function HanoiGame() {
       const why = blocked(cur, from, to);
       if (why) {
         shake(to);
-        say(to, `${from + 1} → ${to + 1} 이동 불가`, why);
+        say(to, [`${from + 1} → ${to + 1} 이동 불가`, `${from + 1} → ${to + 1} not allowed`], why);
         return;
       }
       startClock();
@@ -421,7 +440,11 @@ export default function HanoiGame() {
     if (cur.held === null) {
       if (cur.busy || cur.pending) return;
       if (!cur.pegs[p].length) {
-        say(p, `${p + 1}번 기둥에 원반이 없어요`, '원반이 있는 기둥부터 눌러 주세요');
+        say(
+          p,
+          [`${p + 1}번 기둥에 원반이 없어요`, `Peg ${p + 1} has no disc`],
+          ['원반이 있는 기둥부터 눌러 주세요', 'Pick a peg that has a disc first'],
+        );
         return;
       }
       cur.held = p;
@@ -443,13 +466,13 @@ export default function HanoiGame() {
   function press(d: number) {
     const cur = game.current;
     if (cur.auto) {
-      say(null, '자동 풀이 중이에요', '멈추기를 누른 뒤 옮겨 주세요');
+      say(null, ['자동 풀이 중이에요', 'Auto-solve is running'], ['멈추기를 누른 뒤 옮겨 주세요', 'Press [Stop] before moving']);
       return;
     }
     if (notYet(cur)) return;
     if (d < 1 || d > 3) {
       cur.held = null;
-      say(null, `${d}번 기둥은 없어요`, '1, 2, 3 중에서 눌러 주세요');
+      say(null, [`${d}번 기둥은 없어요`, `There is no peg ${d}`], ['1, 2, 3 중에서 눌러 주세요', 'Press 1, 2 or 3']);
       return;
     }
     const p = d - 1;
@@ -521,7 +544,7 @@ export default function HanoiGame() {
       return;
     }
     build(game.current.n);
-    say(null, '게임을 중지했어요', '[준비]를 누르면 다시 시작해요');
+    say(null, ['게임을 중지했어요', 'Game stopped'], ['[준비]를 누르면 다시 시작해요', 'Press [Ready] to start again']);
   }
 
   function switchMode(next: 'solo' | 'duel') {
@@ -554,18 +577,19 @@ export default function HanoiGame() {
   const best = minMoves(n);
   const done = isDone(g);
   // 상태 칸의 버튼: 준비 → (Ready 5…0) → 진행 중 → 원반을 옮기면 처음부터
-  let status: { label: string; onClick?: () => void };
+  let status: { label: Text2; onClick?: () => void };
   if (mode === 'duel') {
-    if (duel.phase === 'done') status = { label: duel.result?.win ? '승리' : '패배' };
-    else if (duel.phase === 'playing') status = { label: waiting(g) ? '준비 중' : '진행 중' };
-    else if (duel.phase === 'ready') status = { label: '시작 대기' };
-    else status = { label: '대기 중' };
-  } else if (g.auto) status = { label: '자동 풀이 중' };
-  else if (g.moves > 0 || done) status = { label: '처음부터', onClick: restart };
-  else if (!g.started) status = { label: '준비', onClick: begin };
-  else if (waiting(g)) status = { label: '준비 중' };
-  else status = { label: '진행 중' };
-  const statusTitle = done && mode === 'solo' ? (g.moves === best ? '최적 풀이' : '완성') : '상태';
+    if (duel.phase === 'done') status = { label: duel.result?.win ? ['승리', 'Win'] : ['패배', 'Lose'] };
+    else if (duel.phase === 'playing') status = { label: waiting(g) ? ['준비 중', 'Get ready'] : ['진행 중', 'Playing'] };
+    else if (duel.phase === 'ready') status = { label: ['시작 대기', 'Waiting to start'] };
+    else status = { label: ['대기 중', 'Waiting'] };
+  } else if (g.auto) status = { label: ['자동 풀이 중', 'Auto-solving'] };
+  else if (g.moves > 0 || done) status = { label: ['처음부터', 'Restart'], onClick: restart };
+  else if (!g.started) status = { label: ['준비', 'Ready'], onClick: begin };
+  else if (waiting(g)) status = { label: ['준비 중', 'Get ready'] };
+  else status = { label: ['진행 중', 'Playing'] };
+  const statusTitle: Text2 =
+    done && mode === 'solo' ? (g.moves === best ? ['최적 풀이', 'Perfect'] : ['완성', 'Solved']) : ['상태', 'Status'];
   // 진행 중(Ready 를 세는 동안 포함)에만 [중지]를 보인다
   const running =
     mode === 'duel' ? duel.phase === 'playing' && !g.locked : g.started && !done && !g.auto;
@@ -606,7 +630,7 @@ export default function HanoiGame() {
 
   const readout = [
     {
-      k: '원반 수',
+      k: ['원반 수', 'Discs'] as Text2,
       v: (
         <select
           value={n}
@@ -625,7 +649,7 @@ export default function HanoiGame() {
       ),
     },
     {
-      k: '이동 횟수',
+      k: ['이동 횟수', 'Moves'] as Text2,
       v: (
         <>
           {g.moves} <small className="text-[13px] text-ink-3">/ {best}</small>
@@ -633,7 +657,7 @@ export default function HanoiGame() {
       ),
     },
     {
-      k: '시간',
+      k: ['시간', 'Time'] as Text2,
       v: (
         <>
           {seconds(g.elapsed)}
@@ -650,7 +674,8 @@ export default function HanoiGame() {
           onClick={status.onClick}
           className="w-full px-3 py-1 text-[15px]/[1.5] disabled:text-ink-2 disabled:opacity-100 sm:w-auto"
         >
-          {status.label}
+          {status.label[0]}
+          <En>{status.label[1]}</En>
         </Button>
       ),
     },
@@ -665,10 +690,10 @@ export default function HanoiGame() {
           <Seg label="게임 방식" role="tablist">
             {(
               [
-                ['solo', '혼자 하기'],
-                ['duel', '둘이 하기'],
+                ['solo', '혼자 하기', 'Solo'],
+                ['duel', '둘이 하기', 'Duel'],
               ] as const
-            ).map(([m, label]) => (
+            ).map(([m, label, en]) => (
               <SegButton
                 key={m}
                 role="tab"
@@ -678,6 +703,7 @@ export default function HanoiGame() {
                 className="px-4 font-sans text-sm"
               >
                 {label}
+                <En>{en}</En>
               </SegButton>
             ))}
           </Seg>
@@ -692,6 +718,7 @@ export default function HanoiGame() {
             {running && (
               <Button onClick={stopGame} className="px-2.5 py-0.5 text-[13px]/[1.5]">
                 중지
+                <En>Stop</En>
               </Button>
             )}
             {g.ready !== null && (
@@ -723,7 +750,7 @@ export default function HanoiGame() {
                 value={nameDraft}
                 onChange={(e) => setNameDraft(e.target.value)}
                 maxLength={16}
-                placeholder="이름"
+                placeholder="이름 / Name"
                 autoComplete="nickname"
                 enterKeyHint="done"
                 // 16px 보다 작으면 아이폰이 입력할 때 화면을 확대한다
@@ -731,6 +758,7 @@ export default function HanoiGame() {
               />
               <Button variant="primary" type="submit" className="px-2.5 py-0.5">
                 등록
+                <En>Save</En>
               </Button>
               {player && (
                 <Button
@@ -742,6 +770,7 @@ export default function HanoiGame() {
                   }}
                 >
                   취소
+                  <En>Cancel</En>
                 </Button>
               )}
             </form>
@@ -759,6 +788,7 @@ export default function HanoiGame() {
                 className="cursor-pointer rounded-[3px] px-1.5 py-0.5 font-sans text-[12px] text-ink-3 underline underline-offset-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-brass"
               >
                 변경
+                <En>Edit</En>
               </button>
             </div>
           )}
@@ -832,7 +862,10 @@ export default function HanoiGame() {
         <div className="grid grid-cols-2 border-t border-line bg-panel sm:grid-cols-4">
           {readout.map((c, i) => (
             <div key={i} className={cn('px-3 pt-2.5 pb-3 sm:px-4 sm:pt-3 sm:pb-3.5', cellBorder[i])}>
-              <div className={cn(labelText, i === 3 && done && 'font-semibold text-brass')}>{c.k}</div>
+              <div className={cn(labelText, i === 3 && done && 'font-semibold text-brass')}>
+                {c.k[0]}
+                <En>{c.k[1]}</En>
+              </div>
               <div
                 className={cn(
                   'mt-0.5 font-mono text-lg leading-tight text-ink tabular-nums sm:text-[22px]',
@@ -849,9 +882,15 @@ export default function HanoiGame() {
       {mode === 'solo' && (
         <div className="flex flex-wrap items-end gap-x-7 gap-y-5">
           <div className="flex flex-col gap-[7px]">
-            <span className={labelText}>원반 3개로 보기</span>
+            <span className={labelText}>
+              원반 3개로 보기
+              <En>Watch 3 discs</En>
+            </span>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => (g.auto ? stopAuto() : runAuto())}>{g.auto ? '멈추기' : '자동 풀이'}</Button>
+              <Button onClick={() => (g.auto ? stopAuto() : runAuto())}>
+                {g.auto ? '멈추기' : '자동 풀이'}
+                <En>{g.auto ? 'Stop' : 'Auto-solve'}</En>
+              </Button>
             </div>
           </div>
         </div>
@@ -892,13 +931,19 @@ function ErrorBubble({ bubble, bottom, stageH }: { bubble: Bubble; bottom: numbe
       ref={ref}
       role="alert"
       className={cn(
-        'pointer-events-none absolute z-60 w-max max-w-[min(240px,80vw)] animate-pop rounded-md bg-danger px-3 py-2 text-[13px]/[1.45] text-danger-fg shadow-[0_6px_16px_var(--shadow)]',
+        'pointer-events-none absolute z-60 w-max max-w-[min(260px,80vw)] animate-pop rounded-md bg-danger px-3 py-2 text-[13px]/[1.45] text-danger-fg shadow-[0_6px_16px_var(--shadow)]',
         place,
       )}
       style={p === null ? undefined : { left: `${PEG_X[p]}%`, bottom }}
     >
-      <div className="font-semibold">{bubble.title}</div>
-      <div className="opacity-85">{bubble.reason}</div>
+      <div className="font-semibold">
+        {bubble.title[0]}
+        <En>{bubble.title[1]}</En>
+      </div>
+      <div className="opacity-90">
+        {bubble.reason[0]}
+        <EnLine>{bubble.reason[1]}</EnLine>
+      </div>
       {p !== null && <span className={cn('absolute -bottom-1.5 size-3 rotate-45 bg-danger', tail)} />}
     </div>
   );
