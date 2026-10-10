@@ -122,6 +122,7 @@ export default function HanoiGame() {
   const [result, setResult] = useState<Result | null>(null);
   const [rankDiscs, setRankDiscs] = useState(3);
   const pegRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const stageRef = useRef<HTMLDivElement>(null);
   const clock = useRef<ReturnType<typeof setInterval> | null>(null);
   const bubbleId = useRef(0);
   const countdown = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -236,9 +237,11 @@ export default function HanoiGame() {
     return false;
   }
 
+  // 자동 풀이는 보여 주는 게 목적이라 '동작 줄이기'가 켜진 폰에서도 한 수씩 쉬어 가며 둔다
+  // (그때는 미끄러지지 않고 칸을 건너뛰듯 옮겨진다)
   function stepTime() {
-    if (prefersReducedMotion()) return 0;
-    return game.current.auto ? AUTO_STEP_MS : 140;
+    if (game.current.auto) return AUTO_STEP_MS;
+    return prefersReducedMotion() ? 0 : 140;
   }
 
   async function move(from: number, to: number, record: boolean) {
@@ -382,6 +385,11 @@ export default function HanoiGame() {
     const fresh = game.current.n === AUTO_DISCS && !game.current.started && game.current.moves === 0;
     build(AUTO_DISCS);
     setRankDiscs(AUTO_DISCS);
+    // 폰에서 버튼을 누르려고 내려와 있으면 게임판이 화면 밖일 수 있다. 푸는 모습이 보이게 끌어올린다
+    const board = stageRef.current?.getBoundingClientRect();
+    if (board && (board.top < 0 || board.bottom > innerHeight)) {
+      stageRef.current!.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'center' });
+    }
     const cur = game.current;
     const token = ++cur.autoToken;
     cur.auto = true;
@@ -389,7 +397,7 @@ export default function HanoiGame() {
     cur.held = null;
     cur.bubble = null;
     redraw();
-    if (!fresh) await wait(prefersReducedMotion() ? 0 : 240);
+    if (!fresh) await wait(240);
     for (const [a, b] of solve(cur.n)) {
       if (token !== game.current.autoToken) return;
       await move(a, b, true);
@@ -518,6 +526,7 @@ export default function HanoiGame() {
           )}
         </div>
         <div
+          ref={stageRef}
           className="relative h-(--stage-h) w-full touch-manipulation"
           style={
             {
