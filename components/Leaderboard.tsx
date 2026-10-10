@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { DISC_COUNTS, seconds } from '@/lib/hanoi';
-import { addScore, fetchTop } from '@/lib/scores';
+import { fetchTop, submitScore } from '@/lib/scores';
 import { supabase, type Score } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { Button, Seg, SegButton, labelText } from './ui';
@@ -58,12 +58,16 @@ export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted,
   async function send(r: Result) {
     setSending(true);
     try {
-      const id = await addScore({ name: player, ...r });
-      setMyId(id);
-      setNotice({
-        text: `${player} 님 기록(원반 ${r.discs}개, ${r.moves}번, ${seconds(r.ms)}초)을 랭킹에 올렸어요.`,
-        failed: false,
-      });
+      const res = await submitScore({ name: player, ...r });
+      setMyId(res.id);
+      const now = `원반 ${r.discs}개, ${r.moves}번, ${seconds(r.ms)}초`;
+      const text =
+        res.outcome === 'new'
+          ? `${player} 님 기록(${now})을 랭킹에 올렸어요.`
+          : res.outcome === 'better'
+            ? `${player} 님 최고 기록을 ${now}로 바꿨어요.`
+            : `이번 기록(${r.moves}번, ${seconds(r.ms)}초)은 ${player} 님 최고 기록(${res.bestMoves}번, ${seconds(res.bestMs)}초)보다 좋지 않아 랭킹은 그대로예요.`;
+      setNotice({ text, failed: false });
       onSubmitted();
       if (discs === r.discs) setReload((n) => n + 1);
       else onDiscsChange(r.discs);
