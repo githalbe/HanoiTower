@@ -412,6 +412,8 @@ export default function HanoiGame() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      // 도움말 창이 떠 있는 동안에는 원반을 움직이지 않는다
+      if (document.querySelector('dialog[open]')) return;
       if (/^[0-9]$/.test(e.key)) pressRef.current(+e.key);
       else if (e.key === 'Escape') {
         game.current.held = null;
