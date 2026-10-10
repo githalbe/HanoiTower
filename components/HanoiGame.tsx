@@ -85,6 +85,7 @@ function isDone(g: Game) {
 }
 
 const READY_FROM = 5;
+const NAME_KEY = 'hanoi-name';
 // 자동 풀이는 원반 3개짜리로만 보여 준다
 const AUTO_DISCS = 3;
 
@@ -121,6 +122,13 @@ export default function HanoiGame() {
   const [mobile, setMobile] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [rankDiscs, setRankDiscs] = useState(3);
+  // 게임 전에 등록하는 Player 이름. 이 브라우저에 기억해 두고 랭킹에 이 이름으로 올린다
+  const [player, setPlayer] = useState('');
+  const [nameDraft, setNameDraft] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const playerRef = useRef(player);
+  playerRef.current = player;
+  const nameInput = useRef<HTMLInputElement>(null);
   const pegRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const stageRef = useRef<HTMLDivElement>(null);
   const clock = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -154,6 +162,43 @@ export default function HanoiGame() {
     });
     return () => cancelAnimationFrame(id);
   });
+
+  useEffect(() => {
+    let saved = '';
+    try {
+      saved = localStorage.getItem(NAME_KEY) ?? '';
+    } catch {}
+    setPlayer(saved);
+    setNameDraft(saved);
+    setEditingName(!saved);
+  }, []);
+
+  function savePlayer() {
+    const name = nameDraft.trim().slice(0, 16);
+    if (!name) {
+      nameInput.current?.focus();
+      return;
+    }
+    try {
+      localStorage.setItem(NAME_KEY, name);
+    } catch {}
+    setPlayer(name);
+    setNameDraft(name);
+    setEditingName(false);
+  }
+
+  // 이름이 없으면 시작하지 않고 이름 칸으로 보낸다
+  function needPlayer() {
+    if (playerRef.current) return false;
+    setEditingName(true);
+    say(null, '먼저 Player 이름을 등록해 주세요', '게임판 위 이름 칸에 적고 [등록]을 눌러 주세요');
+    requestAnimationFrame(() => nameInput.current?.focus());
+    return true;
+  }
+
+  function begin() {
+    if (!needPlayer()) startCountdown();
+  }
 
   useEffect(() => {
     return () => {
@@ -221,12 +266,13 @@ export default function HanoiGame() {
   // 상태 칸의 [처음부터]: 판을 처음으로 돌리고 바로 Ready 부터 다시 센다
   function restart() {
     build(game.current.n);
-    startCountdown();
+    if (!needPlayer()) startCountdown();
   }
 
   // 아직 옮길 수 없으면 까닭을 말풍선으로 알리고 true
   function notYet(cur: Game) {
     if (!cur.started) {
+      if (needPlayer()) return true;
       say(null, '먼저 [준비]를 눌러 주세요', '상태 칸의 [준비]를 누르면 Ready 5부터 세요');
       return true;
     }
@@ -432,7 +478,7 @@ export default function HanoiGame() {
   let status: { label: string; onClick?: () => void };
   if (g.auto) status = { label: '자동 풀이 중' };
   else if (g.moves > 0 || done) status = { label: '처음부터', onClick: restart };
-  else if (!g.started) status = { label: '준비', onClick: startCountdown };
+  else if (!g.started) status = { label: '준비', onClick: begin };
   else if (waiting(g)) status = { label: '준비 중' };
   else status = { label: '진행 중' };
   const statusTitle = done ? (g.moves === best ? '최적 풀이' : '완성') : '상태';
@@ -527,17 +573,75 @@ export default function HanoiGame() {
     <>
       <div className="rounded border border-line bg-panel px-3 pt-3 shadow-[0_1px_0_var(--shadow)] sm:px-[18px] sm:pt-[18px]">
         {/* 시작 카운트다운. 자리를 늘 비워 두어 숫자가 나타나고 사라져도 게임판이 움직이지 않는다 */}
-        <div className="mb-1 flex h-6 items-center" aria-live="polite">
-          {g.ready !== null && (
-            <span
-              key={g.ready}
-              className={cn(
-                'animate-pop rounded-[3px] border border-brass px-2 font-mono text-[13px] leading-[22px] tabular-nums',
-                g.ready > 0 ? 'text-brass' : 'bg-brass font-semibold text-panel',
-              )}
+        <div className="mb-1.5 flex min-h-8 flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+          <div className="flex h-6 items-center" aria-live="polite">
+            {g.ready !== null && (
+              <span
+                key={g.ready}
+                className={cn(
+                  'animate-pop rounded-[3px] border border-brass px-2 font-mono text-[13px] leading-[22px] tabular-nums',
+                  g.ready > 0 ? 'text-brass' : 'bg-brass font-semibold text-panel',
+                )}
+              >
+                {g.ready > 0 ? `Ready : ${g.ready}` : 'Start!'}
+              </span>
+            )}
+          </div>
+          {editingName ? (
+            <form
+              className="flex items-center gap-1.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                savePlayer();
+              }}
             >
-              {g.ready > 0 ? `Ready : ${g.ready}` : 'Start!'}
-            </span>
+              <label htmlFor="playerName" className="font-mono text-[13px] text-ink-2">
+                Player :
+              </label>
+              <input
+                id="playerName"
+                ref={nameInput}
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                maxLength={16}
+                placeholder="이름"
+                autoComplete="nickname"
+                enterKeyHint="done"
+                // 16px 보다 작으면 아이폰이 입력할 때 화면을 확대한다
+                className="w-28 rounded-[3px] border border-line bg-panel px-2 py-0.5 text-base text-ink focus:outline-2 focus:-outline-offset-1 focus:outline-brass"
+              />
+              <Button variant="primary" type="submit" className="px-2.5 py-0.5">
+                등록
+              </Button>
+              {player && (
+                <Button
+                  type="button"
+                  className="px-2.5 py-0.5"
+                  onClick={() => {
+                    setNameDraft(player);
+                    setEditingName(false);
+                  }}
+                >
+                  취소
+                </Button>
+              )}
+            </form>
+          ) : (
+            <div className="flex items-center gap-2 font-mono text-[13px] text-ink-2">
+              <span>
+                Player : <b className="font-sans text-[15px] font-semibold text-ink">{player}</b>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingName(true);
+                  requestAnimationFrame(() => nameInput.current?.select());
+                }}
+                className="cursor-pointer rounded-[3px] px-1.5 py-0.5 font-sans text-[12px] text-ink-3 underline underline-offset-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-brass"
+              >
+                변경
+              </button>
+            </div>
           )}
         </div>
         <div
@@ -632,7 +736,13 @@ export default function HanoiGame() {
         </div>
       </div>
 
-      <Leaderboard discs={rankDiscs} onDiscsChange={setRankDiscs} result={result} onSubmitted={() => setResult(null)} />
+      <Leaderboard
+        discs={rankDiscs}
+        onDiscsChange={setRankDiscs}
+        result={result}
+        onSubmitted={() => setResult(null)}
+        player={player}
+      />
     </>
   );
 }

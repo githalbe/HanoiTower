@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DISC_COUNTS, seconds } from '@/lib/hanoi';
 import { addScore, fetchTop } from '@/lib/scores';
 import { supabase, type Score } from '@/lib/supabase';
@@ -17,23 +17,22 @@ interface Props {
   // 보고 있는 탭의 원반 수. 게임에서 원반 수를 바꾸면 따라 바뀐다
   discs: number;
   onDiscsChange: (discs: number) => void;
-  // 직접 풀어 완성한 판. 등록하거나 새 판을 시작하면 비운다
+  // 직접 풀어 완성한 판. 올리고 나면 비운다
   result: Result | null;
   onSubmitted: () => void;
+  // 게임 전에 등록한 Player 이름. 완성하면 이 이름으로 바로 랭킹에 올린다
+  player: string;
 }
 
-const NAME_KEY = 'hanoi-name';
-
-export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted }: Props) {
+export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted, player }: Props) {
   const [rows, setRows] = useState<Score[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [reload, setReload] = useState(0);
   const [myId, setMyId] = useState<number | null>(null);
-  const [name, setName] = useState('');
   const [sending, setSending] = useState(false);
-  const [sendFailed, setSendFailed] = useState(false);
-  const nameRef = useRef<HTMLInputElement>(null);
+  const [notice, setNotice] = useState<{ text: string; failed: boolean } | null>(null);
+  const sent = useRef<Result | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -56,40 +55,39 @@ export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted 
     };
   }, [discs, reload]);
 
-  // 완성하면 지난번에 쓴 이름을 채워 두고 입력칸으로 옮겨 간다
-  useEffect(() => {
-    if (!result) return;
-    try {
-      setName(localStorage.getItem(NAME_KEY) ?? '');
-    } catch {}
-    setSendFailed(false);
-    nameRef.current?.focus();
-  }, [result]);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!result) return;
-    const trimmed = name.trim().slice(0, 16);
-    if (!trimmed) {
-      nameRef.current?.focus();
-      return;
-    }
-    try {
-      localStorage.setItem(NAME_KEY, trimmed);
-    } catch {}
+  async function send(r: Result) {
     setSending(true);
     try {
-      const id = await addScore({ name: trimmed, ...result });
+      const id = await addScore({ name: player, ...r });
       setMyId(id);
+      setNotice({
+        text: `${player} 님 기록(원반 ${r.discs}개, ${r.moves}번, ${seconds(r.ms)}초)을 랭킹에 올렸어요.`,
+        failed: false,
+      });
       onSubmitted();
-      if (discs === result.discs) setReload((r) => r + 1);
-      else onDiscsChange(result.discs);
+      if (discs === r.discs) setReload((n) => n + 1);
+      else onDiscsChange(r.discs);
     } catch {
-      setSendFailed(true);
+      setNotice({ text: '기록을 올리지 못했어요. 잠시 후 다시 올려 주세요.', failed: true });
     } finally {
       setSending(false);
     }
   }
+
+  // 완성하면 한 번만 올린다
+  useEffect(() => {
+    if (!result || !supabase || !player || sent.current === result) return;
+    sent.current = result;
+    send(result);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
+
+  // 올렸다는 안내는 잠시 뒤 치운다. 실패 안내는 다시 올릴 때까지 둔다
+  useEffect(() => {
+    if (!notice || notice.failed) return;
+    const id = setTimeout(() => setNotice(null), 8000);
+    return () => clearTimeout(id);
+  }, [notice]);
 
   let empty: string | null = null;
   if (!supabase) empty = '랭킹 서버가 아직 연결되지 않았어요.';
@@ -125,27 +123,21 @@ export default function Leaderboard({ discs, onDiscsChange, result, onSubmitted 
       </div>
       <div className="font-mono text-[11px] tracking-[.12em] text-ink-3">원반 {discs}개 · 적은 이동, 빠른 시간 순</div>
 
-      {result && supabase && (
-        <form className="mt-3.5 flex flex-wrap items-center gap-2 rounded-[3px] bg-panel-2 px-3.5 py-3" onSubmit={submit}>
-          <p className="flex-[1_1_220px] text-sm/[1.6] text-ink-2">
-            {sendFailed
-              ? '등록하지 못했어요. 잠시 후 다시 시도해 주세요.'
-              : `원반 ${result.discs}개를 ${result.moves}번 이동, ${seconds(result.ms)}초에 완성했어요. 랭킹에 올릴까요?`}
-          </p>
-          <input
-            ref={nameRef}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={16}
-            placeholder="이름"
-            autoComplete="nickname"
-            required
-            className="w-[150px] rounded-[3px] border border-line bg-panel px-2.5 py-[7px] text-sm/[1.6] text-ink focus:outline-2 focus:-outline-offset-1 focus:outline-brass"
-          />
-          <Button variant="primary" type="submit" disabled={sending}>
-            기록 등록
-          </Button>
-        </form>
+      {notice && (
+        <div
+          role="status"
+          className={cn(
+            'mt-3.5 flex flex-wrap items-center gap-2 rounded-[3px] px-3.5 py-3 text-sm/[1.6]',
+            notice.failed ? 'bg-panel-2 text-danger' : 'bg-panel-2 text-ink-2',
+          )}
+        >
+          <p className="flex-[1_1_220px]">{notice.text}</p>
+          {notice.failed && result && (
+            <Button variant="primary" disabled={sending} onClick={() => send(result)}>
+              다시 올리기
+            </Button>
+          )}
+        </div>
       )}
 
       <table className="mt-3 w-full border-collapse text-sm/[1.6]">

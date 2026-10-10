@@ -81,6 +81,10 @@ export default function HelpButton() {
           <section>
             <h3 className={sectionTitle}>게임 방법</h3>
             <p className="mb-1.5">
+              먼저 게임판 위 <b className="font-semibold text-ink">Player</b> 칸에 이름을 등록합니다. 다 풀면 이 이름으로
+              랭킹에 바로 올라갑니다.
+            </p>
+            <p className="mb-1.5">
               상태 칸의 <b className="font-semibold text-ink">[준비]</b>를 누르면 Ready 5부터 세고, 0이 되면 시간이
               흐르며 게임이 시작됩니다. 원반을 옮긴 뒤에는 같은 자리가 <b className="font-semibold text-ink">[처음부터]</b>로
               바뀌어 누르면 새로 시작합니다.
