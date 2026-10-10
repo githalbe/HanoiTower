@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 하노이탑 아이콘: 기둥 하나에 원반 셋. 게임의 어두운 화면 색을 쓴다 -->
+  <rect width="512" height="512" rx="112" fill="#17201C"/>
+  <rect x="244" y="104" width="24" height="300" rx="12" fill="#D9A441"/>
+  <rect x="88" y="374" width="336" height="30" rx="12" fill="#D9A441"/>
+  <rect x="120" y="300" width="272" height="66" rx="33" fill="#D2533F"/>
+  <rect x="154" y="226" width="204" height="66" rx="33" fill="#E8B13A"/>
+  <rect x="188" y="152" width="136" height="66" rx="33" fill="#3B9AA0"/>
+</svg>

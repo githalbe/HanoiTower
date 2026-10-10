@@ -10,6 +10,8 @@ const plexSans = IBM_Plex_Sans_KR({ weight: ['400', '600'], subsets: ['latin'], 
 export const metadata: Metadata = {
   title: '하노이탑',
   description: '원반을 옮겨 하노이탑을 풀고 랭킹에 기록을 올리는 게임입니다.',
+  // 아이콘(app/icon.svg, app/apple-icon.png)은 Next 가 알아서 붙인다. 원본 그림은 icon-src/
+  appleWebApp: { capable: true, title: '하노이탑' },
 };
 
 export const viewport: Viewport = {
