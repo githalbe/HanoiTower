@@ -2,8 +2,8 @@
 
 import { useEffect, useLayoutEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
 import Leaderboard, { type Result } from './Leaderboard';
-import { Button, Seg, SegButton, labelText } from './ui';
-import { DISC_COUNTS, formula, minMoves, seconds, solve, type Move } from '@/lib/hanoi';
+import { Button, labelText } from './ui';
+import { DISC_COUNTS, minMoves, seconds, solve, type Move } from '@/lib/hanoi';
 import { cn } from '@/lib/utils';
 
 const PEG_X = [16.667, 50, 83.333];
@@ -472,6 +472,24 @@ export default function HanoiGame() {
 
   const readout = [
     {
+      k: '원반 수',
+      v: (
+        <select
+          value={n}
+          onChange={(e) => changeCount(+e.target.value)}
+          aria-label="원반 수"
+          // 16px 보다 작으면 아이폰이 고를 때 화면을 확대한다
+          className="w-full cursor-pointer rounded-[3px] border border-line bg-panel py-0.5 pr-1 pl-2 font-mono text-base text-ink focus-visible:outline-2 focus-visible:outline-brass sm:w-auto sm:text-[18px]"
+        >
+          {DISC_COUNTS.map((c) => (
+            <option key={c} value={c}>
+              {c}개
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
       k: '이동 횟수',
       v: (
         <>
@@ -479,7 +497,6 @@ export default function HanoiGame() {
         </>
       ),
     },
-    { k: '최소 횟수', v: formula(n) },
     {
       k: '시간',
       v: (
@@ -607,16 +624,6 @@ export default function HanoiGame() {
       </div>
 
       <div className="flex flex-wrap items-end gap-x-7 gap-y-5">
-        <div className="flex flex-col gap-[7px]">
-          <span className={labelText}>원반 수</span>
-          <Seg label="원반 수">
-            {DISC_COUNTS.map((c) => (
-              <SegButton key={c} selected={c === n} aria-pressed={c === n} onClick={() => changeCount(c)}>
-                {c}
-              </SegButton>
-            ))}
-          </Seg>
-        </div>
         <div className="flex flex-col gap-[7px]">
           <span className={labelText}>원반 3개로 보기</span>
           <div className="flex flex-wrap gap-2">
