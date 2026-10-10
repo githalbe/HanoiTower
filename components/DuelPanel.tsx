@@ -2,20 +2,22 @@
 
 import { useState } from 'react';
 import type { Duel } from '@/lib/duel';
+import type { Lobby } from '@/lib/lobby';
 import { minMoves, seconds } from '@/lib/hanoi';
 import { cn } from '@/lib/utils';
 import { Button, En, EnLine } from './ui';
 
 interface Props {
   duel: Duel;
+  lobby: Lobby;
   player: string;
   discs: number;
   // 이름이 없으면 이름 칸으로 보내고 true
   needPlayer: () => boolean;
 }
 
-// 둘이 하기: 방 만들기·참가, 상대 진행, 승부 결과
-export default function DuelPanel({ duel, player, discs, needPlayer }: Props) {
+// 둘이 하기: 대기실(접속자·초대), 방 코드로 만들기·참가, 상대 진행, 승부 결과
+export default function DuelPanel({ duel, lobby, player, discs, needPlayer }: Props) {
   const [codeDraft, setCodeDraft] = useState('');
   const best = minMoves(discs);
 
@@ -31,52 +33,122 @@ export default function DuelPanel({ duel, player, discs, needPlayer }: Props) {
       <En>Leave</En>
     </Button>
   );
+  const sub = 'font-serif text-[15px] font-bold text-ink';
 
   if (duel.phase === 'off') {
     return (
       <div className={cn(box, 'flex flex-col gap-3')}>
-        <p>
-          방을 만들어 코드를 친구에게 알려 주거나, 받은 코드로 들어가세요. 둘이 같이 Ready 5부터 세고 먼저 다 옮긴 사람이 이겨요.
-          <EnLine>
-            Create a room and share the code with a friend, or join with a code you received. You both count down from
-            Ready 5, and whoever finishes first wins.
-          </EnLine>
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" onClick={() => !needPlayer() && duel.create()}>
-            방 만들기
-            <En>Create room</En>
-          </Button>
-          <span className="px-1 text-ink-3">
-            또는<En>or</En>
-          </span>
-          <form
-            className="flex items-center gap-1.5"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!needPlayer()) duel.join(codeDraft.trim());
-            }}
+        {lobby.invites.map((inv) => (
+          <div
+            key={inv.from + inv.code}
+            role="alert"
+            className="flex animate-pop flex-wrap items-center gap-2 rounded-[3px] border border-brass bg-panel-2 px-3 py-2.5"
           >
-            <input
-              value={codeDraft}
-              onChange={(e) => setCodeDraft(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              inputMode="numeric"
-              placeholder="코드 4자리 / Code"
-              aria-label="방 코드"
-              className="w-40 rounded-[3px] border border-line bg-panel px-2.5 py-[5px] font-mono text-base tracking-[.12em] text-ink placeholder:font-sans placeholder:tracking-normal focus:outline-2 focus:-outline-offset-1 focus:outline-brass"
-            />
-            <Button type="submit" disabled={codeDraft.length !== 4}>
-              참가
-              <En>Join</En>
+            <p className="flex-[1_1_200px]">
+              <b className="font-semibold text-ink">{inv.fromName}</b> 님이 대결을 신청했어요.
+              <EnLine>{inv.fromName} invited you to a match.</EnLine>
+            </p>
+            <Button variant="primary" className="px-3 py-1" onClick={() => lobby.accept(inv)}>
+              수락
+              <En>Accept</En>
             </Button>
-          </form>
-        </div>
-        {duel.error && (
+            <Button className="px-3 py-1" onClick={() => lobby.decline(inv)}>
+              거절
+              <En>Decline</En>
+            </Button>
+          </div>
+        ))}
+        {lobby.notice && (
           <p className="text-danger">
-            {duel.error.split('|')[0]}
-            <EnLine>{duel.error.split('|')[1]}</EnLine>
+            {lobby.notice[0]}
+            <EnLine>{lobby.notice[1]}</EnLine>
           </p>
         )}
+
+        <section className="flex flex-col gap-1.5">
+          <h3 className={sub}>
+            접속자<span className="font-sans text-[13px] font-normal text-ink-3"> / Online players</span>
+          </h3>
+          {!player ? (
+            <p>
+              Player 이름을 등록하면 접속자 목록에 들어가요.
+              <EnLine>Register a Player name to join the player list.</EnLine>
+            </p>
+          ) : lobby.players.length === 0 ? (
+            <p className="text-ink-3">
+              지금 접속한 다른 사람이 없어요. 친구에게 [둘이 하기]를 열어 달라고 하세요.
+              <EnLine>No one else is online right now. Ask a friend to open [Duel].</EnLine>
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-line rounded-[3px] border border-line">
+              {lobby.players.map((pl) => (
+                <li key={pl.key} className="flex items-center gap-2 px-3 py-2">
+                  <span className="min-w-0 flex-1 truncate font-semibold text-ink">{pl.name}</span>
+                  <span className={cn('text-[12px]', pl.busy ? 'text-ink-3' : 'text-brass')}>
+                    {pl.busy ? '대결 중 / In a match' : '대기 / Free'}
+                  </span>
+                  <Button
+                    variant="primary"
+                    className="px-3 py-1"
+                    disabled={pl.busy}
+                    onClick={() => !needPlayer() && lobby.invite(pl)}
+                  >
+                    초대
+                    <En>Invite</En>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="flex flex-col gap-1.5 border-t border-line pt-3">
+          <h3 className={sub}>
+            방 코드로 하기<span className="font-sans text-[13px] font-normal text-ink-3"> / Play with a room code</span>
+          </h3>
+          <p>
+            방을 만들어 코드를 친구에게 알려 주거나, 받은 코드로 들어가세요. 둘이 같이 Ready 5부터 세고 먼저 다 옮긴 사람이 이겨요.
+            <EnLine>
+              Create a room and share the code with a friend, or join with a code you received. You both count down
+              from Ready 5, and whoever finishes first wins.
+            </EnLine>
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="primary" onClick={() => !needPlayer() && duel.create()}>
+              방 만들기
+              <En>Create room</En>
+            </Button>
+            <span className="px-1 text-ink-3">
+              또는<En>or</En>
+            </span>
+            <form
+              className="flex items-center gap-1.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!needPlayer()) duel.join(codeDraft.trim());
+              }}
+            >
+              <input
+                value={codeDraft}
+                onChange={(e) => setCodeDraft(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                inputMode="numeric"
+                placeholder="코드 4자리 / Code"
+                aria-label="방 코드"
+                className="w-40 rounded-[3px] border border-line bg-panel px-2.5 py-[5px] font-mono text-base tracking-[.12em] text-ink placeholder:font-sans placeholder:tracking-normal focus:outline-2 focus:-outline-offset-1 focus:outline-brass"
+              />
+              <Button type="submit" disabled={codeDraft.length !== 4}>
+                참가
+                <En>Join</En>
+              </Button>
+            </form>
+          </div>
+          {duel.error && (
+            <p className="text-danger">
+              {duel.error.split('|')[0]}
+              <EnLine>{duel.error.split('|')[1]}</EnLine>
+            </p>
+          )}
+        </section>
       </div>
     );
   }
@@ -85,6 +157,21 @@ export default function DuelPanel({ duel, player, discs, needPlayer }: Props) {
     return (
       <div className={box}>
         방 {duel.code}에 들어가는 중…<EnLine>Joining room {duel.code}…</EnLine>
+      </div>
+    );
+  }
+
+  if (duel.phase === 'waiting' && lobby.outgoing) {
+    return (
+      <div className={cn(box, 'flex flex-wrap items-center justify-between gap-3')}>
+        <p>
+          <b className="font-semibold text-ink">{lobby.outgoing.toName}</b> 님에게 초대를 보냈어요. 답을 기다리는 중…
+          <EnLine>Invite sent to {lobby.outgoing.toName}. Waiting for an answer…</EnLine>
+        </p>
+        <Button className="px-3 py-1" onClick={lobby.cancelInvite}>
+          초대 취소
+          <En>Cancel invite</En>
+        </Button>
       </div>
     );
   }

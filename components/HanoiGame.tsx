@@ -5,6 +5,7 @@ import DuelPanel from './DuelPanel';
 import Leaderboard, { type Result } from './Leaderboard';
 import { Button, En, EnLine, Seg, SegButton, labelText } from './ui';
 import { useDuel } from '@/lib/duel';
+import { useLobby } from '@/lib/lobby';
 import { DISC_COUNTS, minMoves, seconds, solve, type Move } from '@/lib/hanoi';
 import { cn } from '@/lib/utils';
 
@@ -178,6 +179,20 @@ export default function HanoiGame() {
   });
   const duelRef = useRef(duel);
   duelRef.current = duel;
+
+  // 둘이 하기를 열고 이름이 있으면 대기실에 들어가 접속자를 보고 초대를 주고받는다
+  const lobby = useLobby({
+    player,
+    enabled: mode === 'duel' && !!player,
+    busy: duel.phase !== 'off',
+    joinRoom: (code) => duel.join(code),
+    leaveRoom: () => duel.leave(),
+  });
+  // 초대한 상대가 방에 들어오면 보낸 초대는 끝
+  useEffect(() => {
+    if (duel.phase === 'ready' || duel.phase === 'playing') lobby.settled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duel.phase]);
 
   // 원반 수와 화면 폭에 맞춰 무대 높이와 원반 두께를 정한다
   const discH = Math.max(12, Math.min(mobile ? 22 : 24, Math.floor((mobile ? 160 : 210) / n)));
@@ -708,7 +723,9 @@ export default function HanoiGame() {
             ))}
           </Seg>
         </div>
-        {mode === 'duel' && <DuelPanel duel={duel} player={player} discs={n} needPlayer={needPlayer} />}
+        {mode === 'duel' && (
+          <DuelPanel duel={duel} lobby={lobby} player={player} discs={n} needPlayer={needPlayer} />
+        )}
       </div>
 
       <div className="rounded border border-line bg-panel px-3 pt-3 shadow-[0_1px_0_var(--shadow)] sm:px-[18px] sm:pt-[18px]">

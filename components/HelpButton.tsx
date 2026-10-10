@@ -143,8 +143,16 @@ export default function HelpButton() {
             <h3 className={sectionTitle}>
               둘이 하기<En>Duel</En>
             </h3>
+            <p className="mb-1.5">
+              [둘이 하기]를 열면 접속자 목록이 보입니다. 비어 있는 사람 옆 [초대]를 누르면 상대에게 신청이 가고, 상대가
+              [수락]하면 바로 대결 방이 열립니다. 초대한 사람이 방장입니다.
+              <EnLine>
+                Open [Duel] to see who is online. Press [Invite] next to a free player; when they press [Accept], a
+                match room opens for you two. The one who invited is the host.
+              </EnLine>
+            </p>
             <p>
-              [둘이 하기]에서 한 사람이 [방 만들기]를 누르고 나온 숫자 4자리를 친구에게 알려 줍니다. 친구는 그 코드를
+              방 코드로도 할 수 있습니다. [둘이 하기]에서 한 사람이 [방 만들기]를 누르고 나온 숫자 4자리를 친구에게 알려 줍니다. 친구는 그 코드를
               넣고 [참가]를 누릅니다. 방장이 원반 수를 고르고 [대결 시작]을 누르면 둘 다 Ready 5부터 세고, 먼저 다 옮긴
               사람이 이깁니다. 대결 중에 [중지]를 누르거나 나가면 집니다. 대결 기록은 랭킹에 올라가지 않습니다.
               <EnLine>
